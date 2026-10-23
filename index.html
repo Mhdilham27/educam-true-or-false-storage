@@ -6,6 +6,7 @@
   <title>EduCam - Game Edukasi Deteksi Kamera</title>
 
   <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
@@ -414,8 +415,11 @@
   <div id="toast-container" class="fixed bottom-20 right-4 z-50 flex flex-col space-y-2 pointer-events-none"></div>
 
   <script>
-    const STORAGE_KEY = 'educam_questions_storage';
+    const supabaseUrl = 'https://YOUR_PROJECT_ID.supabase.co';
+    const supabaseKey = 'YOUR_ANON_KEY';
+    const supabase = supabase.createClient(supabaseUrl, supabaseKey);
 
+    const STORAGE_KEY = 'educam_questions_storage';
     let questions = [];
     let currentQuestionIndex = 0;
     let timer = 10;
@@ -434,61 +438,119 @@
     let currentQuestionReveal = null;
     let userAnswerSubmitted = false;
     let currentTimerSetting = 10;
+    let answerZoneTimer = null;
 
     const defaultQuestions = [
-      {
-        id: 1,
-        text: 'Matahari terbit dari sebelah Timur.',
-        answer: true,
-        explanation: 'Benar! Perputaran bumi dari barat ke timur menyebabkan matahari terlihat terbit di timur.'
-      },
-      {
-        id: 2,
-        text: 'Air membeku pada suhu 100 derajat Celsius.',
-        answer: false,
-        explanation: 'Salah. Air membeku pada suhu 0°C dan mendidih pada suhu 100°C.'
-      },
-      {
-        id: 3,
-        text: 'Monumen Nasional (Monas) terletak di Jakarta.',
-        answer: true,
-        explanation: 'Benar! Monas berada di Jakarta Pusat.'
-      },
-      {
-        id: 4,
-        text: 'Bumi berputar mengelilingi matahari dalam satu tahun.',
-        answer: true,
-        explanation: 'Benar! Pergerakan bumi mengelilingi matahari membutuhkan waktu kira-kira satu tahun.'
-      },
-      {
-        id: 5,
-        text: 'Padi termasuk tanaman yang hidup di air.',
-        answer: true,
-        explanation: 'Benar! Padi biasanya ditanam di sawah yang tergenang air.'
-      }
+      { id: 1, text: 'Matahari terbit dari sebelah Timur.', answer: true, explanation: 'Benar! Perputaran bumi dari barat ke timur menyebabkan matahari terlihat terbit di timur.' },
+      { id: 2, text: 'Air membeku pada suhu 100 derajat Celsius.', answer: false, explanation: 'Salah. Air membeku pada suhu 0°C dan mendidih pada suhu 100°C.' },
+      { id: 3, text: 'Monumen Nasional (Monas) terletak di Jakarta.', answer: true, explanation: 'Benar! Monas berada di Jakarta Pusat.' },
+      { id: 4, text: 'Bumi berputar mengelilingi matahari dalam satu tahun.', answer: true, explanation: 'Benar! Pergerakan bumi mengelilingi matahari membutuhkan waktu kira-kira satu tahun.' },
+      { id: 5, text: 'Padi termasuk tanaman yang hidup di air.', answer: true, explanation: 'Benar! Padi biasanya ditanam di sawah yang tergenang air.' }
     ];
 
-    function saveQuestionsToStorage() {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(questions));
-    }
-
-    function loadQuestionsFromStorage() {
-      const saved = localStorage.getItem(STORAGE_KEY);
-      if (!saved) {
-        questions = [...defaultQuestions];
-        return;
-      }
-
+    async function loadQuestionsFromDatabase() {
       try {
-        const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed) && parsed.length > 0) {
-          questions = parsed;
+        const { data, error } = await supabase
+          .from('questions')
+          .select('*')
+          .order('created_at', { ascending: true });
+
+        if (error) {
+          console.error('Gagal ambil data soal dari Supabase:', error);
+          questions = [...defaultQuestions];
+          renderQuestionList();
+          return;
+        }
+
+        if (data && data.length > 0) {
+          questions = data.map(item => ({
+            id: item.id,
+            text: item.text,
+            answer: item.answer,
+            explanation: item.explanation || ''
+          }));
         } else {
           questions = [...defaultQuestions];
         }
+
+        renderQuestionList();
       } catch (error) {
-        console.error('Gagal membaca soal dari localStorage:', error);
+        console.error('Gagal load soal:', error);
         questions = [...defaultQuestions];
+        renderQuestionList();
+      }
+    }
+
+    async function saveQuestionToDatabase(newQuestion) {
+      try {
+        const { data, error } = await supabase
+          .from('questions')
+          .insert([
+            {
+              text: newQuestion.text,
+              answer: newQuestion.answer,
+              explanation: newQuestion.explanation || ''
+            }
+          ])
+          .select();
+
+        if (error) {
+          console.error('Gagal simpan soal:', error);
+          showToast('Gagal menyimpan soal ke database', 'error');
+          return false;
+        }
+
+        return true;
+      } catch (error) {
+        console.error('Gagal simpan soal:', error);
+        showToast('Gagal menyimpan soal ke database', 'error');
+        return false;
+      }
+    }
+
+    async function updateQuestionToDatabase(id, updatedQuestion) {
+      try {
+        const { error } = await supabase
+          .from('questions')
+          .update({
+            text: updatedQuestion.text,
+            answer: updatedQuestion.answer,
+            explanation: updatedQuestion.explanation || ''
+          })
+          .eq('id', id);
+
+        if (error) {
+          console.error('Gagal update soal:', error);
+          showToast('Gagal update soal', 'error');
+          return false;
+        }
+
+        return true;
+      } catch (error) {
+        console.error('Gagal update soal:', error);
+        showToast('Gagal update soal', 'error');
+        return false;
+      }
+    }
+
+    async function deleteQuestionFromDatabase(id) {
+      try {
+        const { error } = await supabase
+          .from('questions')
+          .delete()
+          .eq('id', id);
+
+        if (error) {
+          console.error('Gagal hapus soal:', error);
+          showToast('Gagal hapus soal', 'error');
+          return false;
+        }
+
+        return true;
+      } catch (error) {
+        console.error('Gagal hapus soal:', error);
+        showToast('Gagal hapus soal', 'error');
+        return false;
       }
     }
 
@@ -503,7 +565,11 @@
       container.innerHTML = '';
 
       if (!questions.length) {
-        container.innerHTML = '<div class="glass-card p-4 rounded-xl border border-slate-800 text-sm text-slate-400">Belum ada soal. Silakan tambah soal baru.</div>';
+        container.innerHTML = `
+          <div class="glass-card p-4 rounded-xl border border-slate-800 text-sm text-slate-400">
+            Belum ada soal. Silakan tambah soal baru.
+          </div>
+        `;
       } else {
         questions.forEach((q, index) => {
           const item = document.createElement('div');
@@ -533,7 +599,7 @@
       if (warningEl) warningEl.classList.toggle('hidden', questions.length >= 3);
     }
 
-    function handleQuestionSubmit(event) {
+    async function handleQuestionSubmit(event) {
       event.preventDefault();
 
       const text = document.getElementById('input-q-text').value.trim();
@@ -546,82 +612,115 @@
         return;
       }
 
-      const newQuestion = {
-        id: Date.now(),
+      const payload = {
         text,
         answer,
         explanation
       };
 
       if (editIndex >= 0 && questions[editIndex]) {
-        questions[editIndex] = { ...questions[editIndex], ...newQuestion };
+        const currentId = questions[editIndex].id;
+        const ok = await updateQuestionToDatabase(currentId, payload);
+
+        if (!ok) return;
+
+        questions[editIndex] = {
+          ...questions[editIndex],
+          ...payload
+        };
       } else {
-        questions.push(newQuestion);
+        const ok = await saveQuestionToDatabase(payload);
+
+        if (!ok) return;
+
+        const { data, error } = await supabase
+          .from('questions')
+          .select('*')
+          .order('created_at', { ascending: false })
+          .limit(1);
+
+        if (error) {
+          console.error('Gagal ambil soal terakhir:', error);
+        } else if (data && data.length > 0) {
+          questions.push({
+            id: data[0].id,
+            text: data[0].text,
+            answer: data[0].answer,
+            explanation: data[0].explanation || ''
+          });
+        }
       }
 
-      saveQuestionsToStorage();
       renderQuestionList();
       resetQuestionForm();
-      showToast('Soal berhasil disimpan!', 'success');
+      showToast('Soal berhasil disimpan ke database!', 'success');
     }
 
     function resetQuestionForm() {
-      document.getElementById('question-form').reset();
+      const form = document.getElementById('question-form');
+      if (!form) return;
+
+      form.reset();
       document.getElementById('edit-index').value = '-1';
       document.getElementById('form-title').textContent = 'Tambah Soal Baru';
-      document.getElementById('btn-save-question').innerHTML = '<i data-lucide="plus-circle" class="w-4 h-4"></i><span>Simpan Soal</span>';
+      document.getElementById('btn-save-question').innerHTML =
+        '<i data-lucide="plus-circle" class="w-4 h-4"></i><span>Simpan Soal</span>';
       document.querySelector('input[name="input-answer"][value="true"]').checked = true;
       lucide.createIcons();
     }
 
     function editQuestion(index) {
       if (!questions[index]) return;
+
       const q = questions[index];
       document.getElementById('edit-index').value = index;
       document.getElementById('input-q-text').value = q.text;
       document.getElementById('input-q-explanation').value = q.explanation || '';
       document.querySelector(`input[name="input-answer"][value="${q.answer ? 'true' : 'false'}"]`).checked = true;
+
       document.getElementById('form-title').textContent = 'Edit Soal';
-      document.getElementById('btn-save-question').innerHTML = '<i data-lucide="plus-circle" class="w-4 h-4"></i><span>Perbarui Soal</span>';
+      document.getElementById('btn-save-question').innerHTML =
+        '<i data-lucide="plus-circle" class="w-4 h-4"></i><span>Perbarui Soal</span>';
       lucide.createIcons();
       switchTab('questions');
     }
 
-    function deleteQuestion(index) {
+    async function deleteQuestion(index) {
       if (!questions[index]) return;
+
       const confirmed = confirm('Hapus soal ini?');
       if (!confirmed) return;
 
+      const id = questions[index].id;
+      const ok = await deleteQuestionFromDatabase(id);
+
+      if (!ok) return;
+
       questions.splice(index, 1);
-      saveQuestionsToStorage();
       renderQuestionList();
       showToast('Soal berhasil dihapus!', 'success');
     }
 
     function loadSampleQuestions() {
       questions = [
-        {
-          id: 1,
-          text: 'Matahari terbit dari sebelah Timur.',
-          answer: true,
-          explanation: 'Benar! Perputaran bumi dari barat ke timur menyebabkan matahari terlihat terbit di timur.'
-        },
-        {
-          id: 2,
-          text: 'Air membeku pada suhu 100 derajat Celsius.',
-          answer: false,
-          explanation: 'Salah. Air membeku pada suhu 0°C dan mendidih pada suhu 100°C.'
-        },
-        {
-          id: 3,
-          text: 'Monumen Nasional (Monas) terletak di Jakarta.',
-          answer: true,
-          explanation: 'Benar! Monas berada di Jakarta Pusat.'
-        }
+        { id: 1, text: 'Matahari terbit dari sebelah Timur.', answer: true, explanation: 'Benar! Perputaran bumi dari barat ke timur menyebabkan matahari terlihat terbit di timur.' },
+        { id: 2, text: 'Air membeku pada suhu 100 derajat Celsius.', answer: false, explanation: 'Salah. Air membeku pada suhu 0°C dan mendidih pada suhu 100°C.' },
+        { id: 3, text: 'Monumen Nasional (Monas) terletak di Jakarta.', answer: true, explanation: 'Benar! Monas berada di Jakarta Pusat.' }
       ];
-      saveQuestionsToStorage();
+
+      questions.forEach(async (q) => {
+        const { error } = await supabase
+          .from('questions')
+          .insert([{ text: q.text, answer: q.answer, explanation: q.explanation }])
+          .select();
+
+        if (error) {
+          console.error('Gagal simpan soal contoh:', error);
+        }
+      });
+
       renderQuestionList();
-      showToast('Preset soal contoh telah dimuat!', 'success');
+      showToast('Soal contoh berhasil dimuat ke database!', 'success');
     }
 
     function switchTab(tabName) {
@@ -714,8 +813,6 @@
       currentSessionAnswers = [];
       questionOrder = [...Array(questions.length).keys()];
       shuffleArray(questionOrder);
-      answerVisible = false;
-      userAnswerSubmitted = false;
 
       document.getElementById('question-overlay').classList.remove('-translate-y-full', 'opacity-0');
       document.getElementById('question-overlay').classList.add('translate-y-0', 'opacity-100');
@@ -757,6 +854,12 @@
       userAnswerSubmitted = false;
       currentQuestionReveal = current;
 
+      const cameraZones = document.getElementById('camera-zones');
+      if (cameraZones) {
+        cameraZones.classList.add('opacity-0');
+        cameraZones.classList.remove('opacity-100');
+      }
+
       if (document.getElementById('toggle-auto-dictate').checked) {
         dictateCurrentQuestion();
       }
@@ -767,6 +870,38 @@
       document.getElementById('manual-answer-btns').classList.remove('hidden');
       userAnswerSubmitted = false;
       startTimer();
+    }
+
+    function flashAnswerZone(isTrue) {
+      const leftZone = document.getElementById('zone-left');
+      const rightZone = document.getElementById('zone-right');
+      const cameraZones = document.getElementById('camera-zones');
+
+      if (!leftZone || !rightZone || !cameraZones) return;
+
+      cameraZones.classList.remove('opacity-0');
+      cameraZones.classList.add('opacity-100');
+
+      leftZone.classList.remove('opacity-50', 'bg-emerald-500/30', 'border-emerald-500', 'brightness-125', 'scale-[1.02]');
+      rightZone.classList.remove('opacity-50', 'bg-rose-500/30', 'border-rose-500', 'brightness-125', 'scale-[1.02]');
+
+      const target = isTrue ? leftZone : rightZone;
+      const other = isTrue ? rightZone : leftZone;
+
+      target.classList.add('bg-emerald-500/30', 'border-emerald-500', 'brightness-125', 'scale-[1.02]');
+      if (isTrue) {
+        target.classList.add('border-emerald-500');
+      } else {
+        target.classList.add('border-rose-500');
+      }
+      other.classList.add('opacity-50');
+
+      clearTimeout(answerZoneTimer);
+      answerZoneTimer = setTimeout(() => {
+        leftZone.classList.remove('opacity-50', 'bg-emerald-500/30', 'border-emerald-500', 'brightness-125', 'scale-[1.02]');
+        rightZone.classList.remove('opacity-50', 'bg-rose-500/30', 'border-rose-500', 'brightness-125', 'scale-[1.02]');
+        cameraZones.classList.add('opacity-0');
+      }, 1200);
     }
 
     function submitAnswer(isTrue) {
@@ -783,9 +918,11 @@
         correct: isTrue === current.answer
       });
 
+      flashAnswerZone(current.answer);
+
       document.getElementById('manual-answer-btns').classList.add('hidden');
       document.getElementById('view-answer-box').classList.remove('hidden');
-      document.getElementById('view-answer-status').textContent = current.answer ? 'Jawaban benar! Tekan tombol di bawah untuk lihat kunci jawaban.' : 'Waktu habis atau jawaban Anda tercatat. Tekan tombol di bawah untuk melihat kunci jawaban.';
+      document.getElementById('view-answer-status').textContent = current.answer ? 'Jawaban benar! Tekan tombol di bawah untuk lihat kunci jawaban.' : 'Jawaban Anda tidak cocok. Tekan tombol di bawah untuk melihat kunci jawaban.';
       document.getElementById('question-explanation').classList.remove('hidden');
       document.getElementById('question-explanation').textContent = current.explanation;
 
@@ -814,6 +951,8 @@
         correctAnswer: current.answer,
         correct: false
       });
+
+      flashAnswerZone(current.answer);
 
       document.getElementById('manual-answer-btns').classList.add('hidden');
       document.getElementById('view-answer-box').classList.remove('hidden');
@@ -971,7 +1110,7 @@
     }
 
     function initializeDefaults() {
-      loadQuestionsFromStorage();
+      loadQuestionsFromDatabase();
       renderQuestionList();
       resetQuestionForm();
       setTimerSetting(10);
@@ -980,7 +1119,7 @@
     }
 
     document.getElementById('question-form').addEventListener('submit', handleQuestionSubmit);
-    document.getElementById('toggle-auto-dictate').addEventListener('change', function() {
+    document.getElementById('toggle-auto-dictate').addEventListener('change', function () {
       if (this.checked) {
         showToast('Dikte otomatis aktif', 'success');
       }
