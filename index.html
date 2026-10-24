@@ -1,1131 +1,778 @@
 <!DOCTYPE html>
 <html lang="id" class="h-full bg-slate-900 text-slate-100">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>EduCam - Game Edukasi Deteksi Kamera</title>
-
-  <script src="https://cdn.tailwindcss.com"></script>
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-  <script src="https://unpkg.com/lucide@latest"></script>
-  <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
-
-  <script>
-    tailwind.config = {
-      theme: {
-        extend: {
-          fontFamily: {
-            sans: ['"Plus Jakarta Sans"', 'sans-serif'],
-          },
-          colors: {
-            brand: {
-              50: '#eef2ff',
-              100: '#e0e7ff',
-              500: '#6366f1',
-              600: '#4f46e5',
-              700: '#4338ca',
-            }
-          },
-          animation: {
-            'bounce-short': 'bounce 0.5s ease-in-out 1',
-            'pulse-fast': 'pulse 1s infinite',
-            'float': 'float 3s ease-in-out infinite',
-          },
-          keyframes: {
-            float: {
-              '0%, 100%': { transform: 'translateY(0px)' },
-              '50%': { transform: 'translateY(-8px)' },
-            }
-          }
-        }
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>EduCam - Game Edukasi Deteksi Kamera</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <style>
+      body { font-family: Arial, sans-serif; }
+      .glass-card {
+        background: rgba(15, 23, 42, 0.85);
+        backdrop-filter: blur(12px);
+        border: 1px solid rgba(255, 255, 255, 0.12);
       }
-    }
-  </script>
-
-  <style>
-    ::-webkit-scrollbar { width: 8px; }
-    ::-webkit-scrollbar-track { background: #0f172a; }
-    ::-webkit-scrollbar-thumb { background: #334155; border-radius: 4px; }
-    .glass-card { background: rgba(15, 23, 42, 0.85); backdrop-filter: blur(12px); border: 1px solid rgba(255, 255, 255, 0.12); }
-    .glass-pill { background: rgba(30, 41, 59, 0.7); backdrop-filter: blur(8px); border: 1px solid rgba(255, 255, 255, 0.1); }
-    @keyframes bright-flash { 0%, 100% { opacity: 0.95; filter: brightness(1.4); } 50% { opacity: 0.35; filter: brightness(1); } }
-    .animate-bright-flash { animation: bright-flash 0.6s infinite ease-in-out; }
-  </style>
-</head>
-<body class="h-full flex flex-col font-sans antialiased selection:bg-indigo-500 selection:text-white">
-
-  <header class="border-b border-slate-800 bg-slate-950/80 backdrop-blur sticky top-0 z-30">
-    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
-      <div class="flex items-center space-x-3">
-        <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-indigo-500 via-purple-500 to-pink-500 flex items-center justify-center shadow-lg shadow-indigo-500/30">
-          <i data-lucide="camera" class="w-6 h-6 text-white"></i>
-        </div>
-        <div>
-          <h1 class="font-bold text-lg leading-tight bg-gradient-to-r from-white via-indigo-200 to-indigo-400 bg-clip-text text-transparent">EduCam AI</h1>
-          <p class="text-xs text-slate-400">Game Edukasi Benar / Salah Berbasis Kamera</p>
-        </div>
-      </div>
-
-      <nav class="hidden md:flex space-x-1 bg-slate-900 p-1 rounded-xl border border-slate-800">
-        <button id="nav-game-btn" onclick="switchTab('game')" class="px-4 py-2 text-sm font-semibold rounded-lg transition-all flex items-center space-x-2 bg-indigo-600 text-white shadow">
-          <i data-lucide="gamepad-2" class="w-4 h-4"></i>
-          <span>Arena Game</span>
-        </button>
-        <button id="nav-questions-btn" onclick="switchTab('questions')" class="px-4 py-2 text-sm font-semibold rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-all flex items-center space-x-2">
-          <i data-lucide="file-edit" class="w-4 h-4"></i>
-          <span>Kelola Soal</span>
-          <span id="question-count-badge" class="bg-indigo-900 text-indigo-300 text-xs px-2 py-0.5 rounded-full font-bold">0</span>
-        </button>
-        <button id="nav-settings-btn" onclick="switchTab('settings')" class="px-4 py-2 text-sm font-semibold rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-all flex items-center space-x-2">
-          <i data-lucide="sliders" class="w-4 h-4"></i>
-          <span>Pengaturan Waktu</span>
-        </button>
-      </nav>
-
-      <div class="flex items-center space-x-2">
-        <div id="cam-status-indicator" class="hidden sm:flex items-center space-x-2 px-3 py-1.5 rounded-full bg-slate-900 border border-slate-800 text-xs text-slate-400">
-          <span class="w-2 h-2 rounded-full bg-red-500 animate-pulse" id="cam-dot"></span>
-          <span id="cam-status-text">Kamera Mati</span>
-        </div>
-        <button onclick="toggleGlobalSound()" id="sound-toggle-btn" class="p-2 rounded-lg bg-slate-800 text-slate-300 hover:text-white hover:bg-slate-700 transition" title="Toggle Suara Effects">
-          <i data-lucide="volume-2" class="w-5 h-5"></i>
-        </button>
-      </div>
-    </div>
-  </header>
-
-  <div class="md:hidden fixed bottom-0 left-0 right-0 bg-slate-950 border-t border-slate-800 z-40 px-4 py-2 flex justify-around">
-    <button onclick="switchTab('game')" class="flex flex-col items-center text-xs text-indigo-400 py-1">
-      <i data-lucide="gamepad-2" class="w-5 h-5"></i>
-      <span>Game</span>
-    </button>
-    <button onclick="switchTab('questions')" class="flex flex-col items-center text-xs text-slate-400 py-1">
-      <i data-lucide="file-edit" class="w-5 h-5"></i>
-      <span>Soal</span>
-    </button>
-    <button onclick="switchTab('settings')" class="flex flex-col items-center text-xs text-slate-400 py-1">
-      <i data-lucide="sliders" class="w-5 h-5"></i>
-      <span>Waktu</span>
-    </button>
-  </div>
-
-  <main class="flex-1 max-w-7xl w-full mx-auto p-4 sm:p-6 lg:p-8 flex flex-col justify-center">
-
-    <section id="tab-game" class="space-y-6 flex flex-col items-center">
-      <div class="w-full max-w-4xl flex flex-wrap items-center justify-between gap-4 bg-slate-950 p-4 rounded-2xl border border-slate-800">
+    </style>
+  </head>
+  <body class="h-full flex flex-col bg-slate-900 text-slate-100">
+    <header class="border-b border-slate-800 bg-slate-950/80 sticky top-0 z-30">
+      <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
         <div class="flex items-center space-x-3">
-          <button onclick="startWebcam()" id="btn-start-cam" class="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-semibold rounded-xl text-sm transition flex items-center space-x-2">
-            <i data-lucide="video" class="w-4 h-4"></i>
-            <span>Nyalakan Kamera</span>
+          <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-indigo-500 via-purple-500 to-pink-500 flex items-center justify-center shadow-lg shadow-indigo-500/30">
+            <i data-lucide="camera" class="w-6 h-6 text-white"></i>
+          </div>
+          <div>
+            <h1 class="font-bold text-lg">EduCam AI</h1>
+            <p class="text-xs text-slate-400">Game Edukasi Benar / Salah Berbasis Kamera</p>
+          </div>
+        </div>
+
+        <nav class="hidden md:flex space-x-1 bg-slate-900 p-1 rounded-xl border border-slate-800">
+          <button id="nav-game-btn" onclick="switchTab('game')" class="px-4 py-2 text-sm font-semibold rounded-lg bg-indigo-600 text-white shadow">
+            <span>Arena Game</span>
           </button>
-          <button onclick="toggleFullscreenCam()" id="btn-full-cam" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white font-semibold rounded-xl text-sm transition flex items-center space-x-2">
-            <i data-lucide="maximize" class="w-4 h-4"></i>
-            <span>Tombol Full Kamera</span>
+          <button id="nav-questions-btn" onclick="switchTab('questions')" class="px-4 py-2 text-sm font-semibold rounded-lg text-slate-400">
+            <span>Kelola Soal</span>
+            <span id="question-count-badge" class="bg-indigo-900 text-indigo-300 text-xs px-2 py-0.5 rounded-full font-bold">0</span>
+          </button>
+          <button id="nav-settings-btn" onclick="switchTab('settings')" class="px-4 py-2 text-sm font-semibold rounded-lg text-slate-400">
+            <span>Pengaturan Waktu</span>
+          </button>
+        </nav>
+
+        <div class="flex items-center space-x-2">
+          <div id="cam-status-indicator" class="hidden sm:flex items-center space-x-2 px-3 py-1.5 rounded-full bg-slate-900 border border-slate-800 text-xs text-slate-400">
+            <span class="w-2 h-2 rounded-full bg-red-500 animate-pulse" id="cam-dot"></span>
+            <span id="cam-status-text">Kamera Mati</span>
+          </div>
+          <button onclick="toggleGlobalSound()" id="sound-toggle-btn" class="p-2 rounded-lg bg-slate-800 text-slate-300 hover:text-white hover:bg-slate-700 transition" title="Toggle Suara Effects">
+            <i data-lucide="volume-2" class="w-5 h-5"></i>
           </button>
         </div>
-
-        <div class="flex items-center space-x-4">
-          <div class="bg-slate-900 px-3 py-1.5 rounded-xl border border-slate-800 text-xs font-semibold text-slate-300">
-            Durasi: <span id="display-timer-setting" class="text-indigo-400 font-bold">10 Detik</span>
-          </div>
-          <button onclick="startGame()" id="btn-start-game" class="px-6 py-2 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 text-slate-950 font-extrabold rounded-xl text-sm transition flex items-center space-x-2">
-            <i data-lucide="play" class="w-4 h-4 fill-current"></i>
-            <span>Mulai Permainan</span>
-          </button>
-        </div>
       </div>
+    </header>
 
-      <div id="camera-container" class="relative w-full max-w-4xl aspect-video bg-slate-950 rounded-3xl overflow-hidden border-2 border-slate-800 shadow-2xl flex items-center justify-center group">
-        <video id="webcam-video" autoplay playsinline muted class="w-full h-full object-cover -scale-x-100 hidden"></video>
-        <canvas id="camera-canvas" class="absolute inset-0 w-full h-full pointer-events-none -scale-x-100"></canvas>
-
-        <div id="camera-placeholder" class="text-center p-8 flex flex-col items-center space-y-4">
-          <div class="w-20 h-20 rounded-full bg-slate-900 border border-slate-800 flex items-center justify-center text-slate-600 group-hover:scale-105 transition">
-            <i data-lucide="camera-off" class="w-10 h-10"></i>
-          </div>
-          <div>
-            <h3 class="text-lg font-bold text-slate-200">Kamera Belum Aktif</h3>
-            <p class="text-sm text-slate-400 max-w-md mt-1">Tekan tombol <strong class="text-emerald-400">"Nyalakan Kamera"</strong> di atas atau tekan <strong class="text-indigo-400">"Tombol Full Kamera"</strong> untuk mendeteksi gerakan.</p>
-          </div>
-        </div>
-
-        <div id="camera-zones" class="absolute inset-0 pointer-events-none flex opacity-0 transition-all duration-300">
-          <div id="zone-left" class="w-1/2 h-full border-r-2 border-dashed border-emerald-500/40 bg-emerald-950/20 flex flex-col items-center justify-between p-6 transition-all duration-300">
-            <div class="flex flex-col items-center space-y-1 mt-2">
-              <span class="text-4xl sm:text-5xl font-black text-emerald-400 drop-shadow-[0_2px_8px_rgba(0,0,0,0.8)] tracking-wider">BENAR</span>
-              <span class="text-[11px] font-bold text-emerald-200 bg-emerald-950/90 px-3 py-1 rounded-full border border-emerald-500/30">Arahkan Gerakan di Sisi Kiri</span>
-            </div>
-            <div class="w-3/4 max-w-xs bg-slate-950/80 border border-emerald-500/30 p-1.5 rounded-full flex items-center space-x-2">
-              <span class="text-[9px] font-extrabold text-emerald-400 uppercase tracking-tight pl-1">Sensitivitas</span>
-              <div class="flex-1 bg-slate-900 h-2 rounded-full overflow-hidden border border-slate-800">
-                <div id="meter-left" class="bg-emerald-400 h-full w-0 transition-all duration-75"></div>
-              </div>
-            </div>
-          </div>
-
-          <div id="zone-right" class="w-1/2 h-full border-l-2 border-dashed border-rose-500/40 bg-rose-950/20 flex flex-col items-center justify-between p-6 transition-all duration-300">
-            <div class="flex flex-col items-center space-y-1 mt-2">
-              <span class="text-4xl sm:text-5xl font-black text-rose-400 drop-shadow-[0_2px_8px_rgba(0,0,0,0.8)] tracking-wider">SALAH</span>
-              <span class="text-[11px] font-bold text-rose-200 bg-rose-950/90 px-3 py-1 rounded-full border border-rose-500/30">Arahkan Gerakan di Sisi Kanan</span>
-            </div>
-            <div class="w-3/4 max-w-xs bg-slate-950/80 border border-rose-500/30 p-1.5 rounded-full flex items-center space-x-2">
-              <span class="text-[9px] font-extrabold text-rose-400 uppercase tracking-tight pl-1">Sensitivitas</span>
-              <div class="flex-1 bg-slate-900 h-2 rounded-full overflow-hidden border border-slate-800">
-                <div id="meter-right" class="bg-rose-400 h-full w-0 transition-all duration-75"></div>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <div id="question-overlay" class="absolute top-3 inset-x-3 sm:inset-x-6 glass-card rounded-xl p-3 sm:p-4 shadow-2xl border border-indigo-500/30 transform transition-all duration-300 -translate-y-full opacity-0 z-20">
-          <div class="flex items-center justify-between mb-2 pb-2 border-b border-slate-800/80">
-            <div class="flex items-center space-x-2 sm:space-x-3">
-              <span class="bg-indigo-500/20 text-indigo-300 text-[11px] sm:text-xs font-bold px-2.5 py-0.5 rounded-full border border-indigo-500/30">
-                Soal <span id="current-q-num">1</span> / <span id="total-q-num">5</span>
-              </span>
-              <button onclick="dictateCurrentQuestion()" class="flex items-center space-x-1 text-[11px] sm:text-xs font-medium text-amber-400 hover:text-amber-300 bg-amber-500/10 hover:bg-amber-500/20 px-2 py-1 rounded-lg border border-amber-500/30 transition">
-                <i data-lucide="volume-2" class="w-3.5 h-3.5 animate-pulse"></i>
-                <span class="hidden sm:inline">Mendikte Soal</span>
-              </button>
-            </div>
-            <div class="flex items-center space-x-1.5">
-              <i data-lucide="clock" class="w-3.5 h-3.5 text-amber-400"></i>
-              <div id="timer-display" class="font-mono text-base sm:text-lg font-extrabold text-amber-400">10s</div>
-            </div>
-          </div>
-
-          <div class="w-full text-center py-1">
-            <h2 id="question-text" class="text-sm sm:text-base font-extrabold text-white leading-snug">Memuat pertanyaan...</h2>
-            <p id="question-explanation" class="text-xs font-semibold text-indigo-200 mt-1.5 hidden bg-indigo-950/90 p-2 rounded-lg border border-indigo-500/30 max-h-24 overflow-y-auto"></p>
-          </div>
-
-          <div id="action-controls" class="mt-2 pt-2 border-t border-slate-800">
-            <div id="student-prep-box" class="flex flex-col items-center space-y-1.5">
-              <span class="text-[11px] text-amber-300 font-semibold flex items-center space-x-1">
-                <i data-lucide="info" class="w-3 h-3"></i>
-                <span>Persiapan Murid: Pastikan posisi sudah siap!</span>
-              </span>
-              <button onclick="startStudentAnswering()" class="w-full max-w-xs py-2 px-4 bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 text-slate-950 font-black text-xs sm:text-sm rounded-lg shadow-lg shadow-emerald-500/20 transition flex items-center justify-center space-x-2">
-                <i data-lucide="play-circle" class="w-4 h-4 fill-current"></i>
-                <span>Mulai Jawab Sekarang!</span>
-              </button>
-            </div>
-
-            <div id="manual-answer-btns" class="hidden grid grid-cols-2 gap-2">
-              <button onclick="submitAnswer(true)" class="py-2 px-3 bg-emerald-600/90 hover:bg-emerald-500 text-white font-extrabold text-xs sm:text-sm rounded-lg shadow-lg border border-emerald-400/30 transition flex items-center justify-center space-x-1">
-                <i data-lucide="check-circle-2" class="w-4 h-4"></i>
-                <span>BENAR (Kiri)</span>
-              </button>
-              <button onclick="submitAnswer(false)" class="py-2 px-3 bg-rose-600/90 hover:bg-rose-500 text-white font-extrabold text-xs sm:text-sm rounded-lg shadow-lg border border-rose-400/30 transition flex items-center justify-center space-x-1">
-                <i data-lucide="x-circle" class="w-4 h-4"></i>
-                <span>SALAH (Kanan)</span>
-              </button>
-            </div>
-
-            <div id="view-answer-box" class="hidden flex flex-col items-center space-y-1.5">
-              <span id="view-answer-status" class="text-[11px] text-amber-400 font-bold">Waktu Habis! Tekan tombol di bawah untuk melihat kunci jawaban.</span>
-              <button onclick="revealAnswer()" class="w-full max-w-xs py-2 px-4 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 text-slate-950 font-black text-xs sm:text-sm rounded-lg shadow-lg shadow-amber-500/20 transition flex items-center justify-center space-x-2">
-                <i data-lucide="eye" class="w-4 h-4"></i>
-                <span>Lihat Jawaban</span>
-              </button>
-            </div>
-
-            <div id="teacher-next-box" class="hidden flex flex-col items-center space-y-1.5">
-              <button onclick="nextQuestionByTeacher()" class="w-full max-w-sm py-2 px-4 bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500 hover:brightness-110 text-white font-black text-xs sm:text-sm rounded-lg shadow-lg shadow-indigo-500/20 transition flex items-center justify-center space-x-2">
-                <span>Tombol Guru: Soal Selanjutnya</span>
-                <i data-lucide="arrow-right-circle" class="w-4 h-4"></i>
-              </button>
-            </div>
-          </div>
-        </div>
-
-        <button id="btn-exit-fullscreen" onclick="toggleFullscreenCam()" class="absolute top-4 right-4 bg-slate-900/80 hover:bg-slate-900 text-white p-2.5 rounded-full border border-slate-700 hidden shadow-xl z-30">
-          <i data-lucide="minimize-2" class="w-5 h-5"></i>
-        </button>
-      </div>
-
-      <div class="w-full max-w-4xl grid grid-cols-1 md:grid-cols-3 gap-4 text-xs text-slate-400">
-        <div class="glass-card p-3 rounded-xl flex items-center space-x-3">
-          <div class="p-2 rounded-lg bg-indigo-500/20 text-indigo-400"><i data-lucide="maximize" class="w-5 h-5"></i></div>
-          <div><strong class="text-slate-200">Tombol Full Kamera:</strong> Memperbesar kamera & memunculkan soal langsung di atas layar video.</div>
-        </div>
-        <div class="glass-card p-3 rounded-xl flex items-center space-x-3">
-          <div class="p-2 rounded-lg bg-emerald-500/20 text-emerald-400"><i data-lucide="hand" class="w-5 h-5"></i></div>
-          <div><strong class="text-slate-200">Identifikasi Gerakan:</strong> Gerakkan tangan ke zona hijau (BENAR) atau zona merah (SALAH).</div>
-        </div>
-        <div class="glass-card p-3 rounded-xl flex items-center space-x-3">
-          <div class="p-2 rounded-lg bg-amber-500/20 text-amber-400"><i data-lucide="volume-2" class="w-5 h-5"></i></div>
-          <div><strong class="text-slate-200">Fitur Pendikte:</strong> Sistem akan otomatis membacakan soal dalam bahasa Indonesia.</div>
-        </div>
-      </div>
-    </section>
-
-    <section id="tab-questions" class="hidden space-y-8 max-w-4xl mx-auto w-full">
-      <div class="flex flex-wrap items-center justify-between gap-4 border-b border-slate-800 pb-4">
-        <div>
-          <h2 class="text-xl font-bold text-white flex items-center space-x-2">
-            <i data-lucide="file-text" class="text-indigo-400"></i>
-            <span>Pembuatan Soal Manual (Berbasis Kata)</span>
-          </h2>
-          <p class="text-xs text-slate-400 mt-1">Atur minimal 3 hingga maksimal 20 soal dalam format teks pernyataan Benar / Salah.</p>
-        </div>
-        <button onclick="loadSampleQuestions()" class="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-xs font-semibold text-indigo-300 rounded-lg border border-slate-700 transition flex items-center space-x-2">
-          <i data-lucide="rotate-ccw" class="w-3.5 h-3.5"></i>
-          <span>Muat Preset Soal Contoh</span>
-        </button>
-      </div>
-
-      <div class="glass-card p-6 rounded-2xl border border-slate-800 space-y-4">
-        <h3 id="form-title" class="text-sm font-bold text-indigo-300 uppercase tracking-wider">Tambah Soal Baru</h3>
-
-        <form id="question-form" onsubmit="handleQuestionSubmit(event)" class="space-y-4">
-          <input type="hidden" id="edit-index" value="-1">
-
-          <div>
-            <label class="block text-xs font-semibold text-slate-300 mb-1">Pertanyaan / Pernyataan *</label>
-            <textarea id="input-q-text" rows="2" required placeholder="Contoh: Ibu kota negara Indonesia adalah Nusantara." class="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-sm text-white focus:ring-2 focus:ring-indigo-500 focus:outline-none"></textarea>
-          </div>
-
-          <div>
-            <label class="block text-xs font-semibold text-slate-300 mb-2">Jawaban Benar *</label>
-            <div class="grid grid-cols-2 gap-3 max-w-md">
-              <label class="flex items-center justify-center p-3 rounded-xl border border-slate-800 bg-slate-950 hover:border-emerald-500/50 cursor-pointer transition group">
-                <input type="radio" name="input-answer" value="true" checked class="text-emerald-500 focus:ring-emerald-500">
-                <span class="ml-2 text-sm font-bold text-emerald-400 group-hover:text-emerald-300">BENAR</span>
-              </label>
-              <label class="flex items-center justify-center p-3 rounded-xl border border-slate-800 bg-slate-950 hover:border-rose-500/50 cursor-pointer transition group">
-                <input type="radio" name="input-answer" value="false" class="text-rose-500 focus:ring-rose-500">
-                <span class="ml-2 text-sm font-bold text-rose-400 group-hover:text-rose-300">SALAH</span>
-              </label>
-            </div>
-          </div>
-
-          <div>
-            <label class="block text-xs font-semibold text-slate-300 mb-1">Penjelasan Tambahan (Muncul setelah dijawab)</label>
-            <input type="text" id="input-q-explanation" placeholder="Contoh: Nusantara telah ditetapkan secara resmi sebagai Ibu Kota Negara." class="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-sm text-white focus:ring-2 focus:ring-indigo-500 focus:outline-none">
-          </div>
-
-          <div class="flex items-center justify-end space-x-3 pt-2">
-            <button type="button" onclick="resetQuestionForm()" class="px-4 py-2 text-xs font-semibold text-slate-400 hover:text-white transition">Batal</button>
-            <button type="submit" id="btn-save-question" class="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white font-bold rounded-xl text-xs shadow-lg shadow-indigo-600/30 transition flex items-center space-x-2">
-              <i data-lucide="plus-circle" class="w-4 h-4"></i>
-              <span>Simpan Soal</span>
+    <main class="flex-1 max-w-7xl w-full mx-auto p-4 sm:p-6 lg:p-8 flex flex-col justify-center">
+      <section id="tab-game" class="space-y-6 flex flex-col items-center">
+        <div class="w-full max-w-4xl flex flex-wrap items-center justify-between gap-4 bg-slate-950 p-4 rounded-2xl border border-slate-800">
+          <div class="flex items-center space-x-3">
+            <button onclick="startWebcam()" id="btn-start-cam" class="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-semibold rounded-xl text-sm transition">
+              <span>Nyalakan Kamera</span>
+            </button>
+            <button onclick="toggleFullscreenCam()" id="btn-full-cam" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white font-semibold rounded-xl text-sm transition">
+              <span>Full Kamera</span>
             </button>
           </div>
-        </form>
-      </div>
 
-      <div class="space-y-3">
-        <div class="flex items-center justify-between">
-          <h3 class="text-sm font-bold text-slate-300">Daftar Soal Aktif (<span id="q-list-count">0</span>/20)</h3>
-          <span id="q-limit-warning" class="text-xs text-amber-400 hidden">Minimal butuh 3 soal untuk memulai game!</span>
-        </div>
-
-        <div id="questions-list-container" class="space-y-3"></div>
-      </div>
-    </section>
-
-    <section id="tab-settings" class="hidden space-y-6 max-w-2xl mx-auto w-full">
-      <div class="border-b border-slate-800 pb-4">
-        <h2 class="text-xl font-bold text-white flex items-center space-x-2">
-          <i data-lucide="sliders" class="text-indigo-400"></i>
-          <span>Pengaturan Waktu & Dikte</span>
-        </h2>
-        <p class="text-xs text-slate-400 mt-1">Kustomisasi batas waktu per soal dan opsi bacaan suara otomatis.</p>
-      </div>
-
-      <div class="glass-card p-6 rounded-2xl border border-slate-800 space-y-4">
-        <label class="block text-sm font-bold text-slate-200">Pilih Batas Waktu Dijawab Per Soal:</label>
-        <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
-          <button type="button" onclick="setTimerSetting(5)" class="timer-opt-btn p-4 rounded-xl border border-slate-800 bg-slate-950 text-center hover:border-indigo-500 transition" data-time="5">
-            <span class="block text-2xl font-black text-indigo-400">5s</span>
-            <span class="text-[10px] font-semibold text-slate-400">Sangat Cepat</span>
-          </button>
-          <button type="button" onclick="setTimerSetting(10)" class="timer-opt-btn p-4 rounded-xl border border-slate-800 bg-slate-950 text-center hover:border-indigo-500 transition active border-indigo-500 bg-indigo-950/40" data-time="10">
-            <span class="block text-2xl font-black text-indigo-400">10s</span>
-            <span class="text-[10px] font-semibold text-slate-400">Standar (Rekomendasi)</span>
-          </button>
-          <button type="button" onclick="setTimerSetting(15)" class="timer-opt-btn p-4 rounded-xl border border-slate-800 bg-slate-950 text-center hover:border-indigo-500 transition" data-time="15">
-            <span class="block text-2xl font-black text-indigo-400">15s</span>
-            <span class="text-[10px] font-semibold text-slate-400">Santai</span>
-          </button>
-          <button type="button" onclick="setTimerSetting(20)" class="timer-opt-btn p-4 rounded-xl border border-slate-800 bg-slate-950 text-center hover:border-indigo-500 transition" data-time="20">
-            <span class="block text-2xl font-black text-indigo-400">20s</span>
-            <span class="text-[10px] font-semibold text-slate-400">Pemula</span>
-          </button>
-        </div>
-      </div>
-
-      <div class="glass-card p-6 rounded-2xl border border-slate-800 space-y-4">
-        <h3 class="text-sm font-bold text-slate-200 flex items-center space-x-2">
-          <i data-lucide="mic" class="w-4 h-4 text-amber-400"></i>
-          <span>Pengaturan Fitur Mendiktekan Soal</span>
-        </h3>
-
-        <div class="flex items-center justify-between p-3 bg-slate-950 rounded-xl border border-slate-800">
-          <div>
-            <span class="block text-xs font-bold text-white">Dikte Otomatis Saat Soal Muncul</span>
-            <span class="text-[10px] text-slate-400">Membacakan teks pertanyaan secara otomatis menggunakan narasi suara.</span>
+          <div class="flex items-center space-x-4">
+            <div class="bg-slate-900 px-3 py-1.5 rounded-xl border border-slate-800 text-xs font-semibold text-slate-300">
+              Durasi: <span id="display-timer-setting" class="text-indigo-400 font-bold">10 Detik</span>
+            </div>
+            <button onclick="startGame()" id="btn-start-game" class="px-6 py-2 bg-gradient-to-r from-amber-500 to-orange-500 text-slate-950 font-extrabold rounded-xl">
+              <span>Mulai Permainan</span>
+            </button>
           </div>
-          <label class="relative inline-flex items-center cursor-pointer">
-            <input type="checkbox" id="toggle-auto-dictate" checked class="sr-only peer">
-            <div class="w-11 h-6 bg-slate-800 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:left-[2px] after:bg-white after:border after:rounded-full after:h-5 after:w-5 after:transition-all rounded-full"></div>
-          </label>
         </div>
-      </div>
-    </section>
-  </main>
 
-  <div id="result-modal" class="fixed inset-0 bg-slate-950/80 backdrop-blur-md z-50 flex items-center justify-center p-4 hidden">
-    <div class="glass-card max-w-md w-full rounded-3xl p-6 text-center border border-indigo-500/30 shadow-2xl space-y-4 animate-bounce-short">
-      <div class="w-16 h-16 rounded-2xl bg-gradient-to-tr from-amber-400 to-amber-600 mx-auto flex items-center justify-center text-slate-950 shadow-lg shadow-amber-500/30">
-        <i data-lucide="trophy" class="w-8 h-8"></i>
-      </div>
-      <div>
-        <h2 class="text-2xl font-extrabold text-white">Permainan Selesai!</h2>
-        <p class="text-xs text-slate-400 mt-1">Berikut adalah hasil evaluasi identifikasi Anda.</p>
-      </div>
+        <div id="camera-container" class="relative w-full max-w-4xl aspect-video bg-slate-950 rounded-3xl overflow-hidden border-2 border-slate-800 shadow-2xl flex items-center justify-center">
+          <video id="webcam-video" autoplay playsinline muted class="w-full h-full object-cover hidden"></video>
+          <canvas id="camera-canvas" class="absolute inset-0 w-full h-full pointer-events-none hidden"></canvas>
 
-      <div class="bg-slate-950/80 rounded-2xl p-4 border border-slate-800 grid grid-cols-2 gap-2">
+          <div id="camera-placeholder" class="text-center p-8 flex flex-col items-center space-y-4">
+            <div class="w-20 h-20 rounded-full bg-slate-900 border border-slate-800 flex items-center justify-center text-slate-600">
+              <i data-lucide="camera-off" class="w-10 h-10"></i>
+            </div>
+            <div>
+              <h3 class="text-lg font-bold text-slate-200">Kamera Belum Aktif</h3>
+              <p class="text-sm text-slate-400 max-w-md mt-1">Klik tombol <strong class="text-emerald-400">Nyalakan Kamera</strong> untuk mengaktifkan kamera.</p>
+            </div>
+          </div>
+
+          <div id="camera-zones" class="absolute inset-0 pointer-events-none flex opacity-0 transition-all duration-300">
+            <div id="zone-left" class="w-1/2 h-full border-r-2 border-dashed border-emerald-500/40 bg-emerald-950/20 flex flex-col items-center justify-between p-6">
+              <div class="flex flex-col items-center space-y-1 mt-2 text-center">
+                <span class="text-4xl sm:text-5xl font-black text-emerald-400 tracking-wider">BENAR</span>
+              </div>
+            </div>
+            <div id="zone-right" class="w-1/2 h-full border-l-2 border-dashed border-rose-500/40 bg-rose-950/20 flex flex-col items-center justify-between p-6">
+              <div class="flex flex-col items-center space-y-1 mt-2 text-center">
+                <span class="text-4xl sm:text-5xl font-black text-rose-400 tracking-wider">SALAH</span>
+              </div>
+            </div>
+          </div>
+
+          <div id="question-overlay" class="absolute top-3 inset-x-3 sm:inset-x-6 glass-card rounded-xl p-3 sm:p-4 shadow-2xl border border-indigo-500/30 transform transition-all duration-300 -translate-y-full opacity-0">
+            <div class="flex items-center justify-between mb-2 pb-2 border-b border-slate-800/80">
+              <div class="flex items-center space-x-2 sm:space-x-3">
+                <span class="bg-indigo-500/20 text-indigo-300 text-[11px] sm:text-xs font-bold px-2.5 py-0.5 rounded-full border border-indigo-500/30">
+                  Soal <span id="current-q-num">1</span> / <span id="total-q-num">1</span>
+                </span>
+                <button onclick="dictateCurrentQuestion()" class="flex items-center space-x-1 text-[11px] sm:text-xs font-medium text-amber-400 hover:text-amber-300 bg-amber-500/10 rounded-lg px-2 py-1">
+                  <i data-lucide="volume-2" class="w-3.5 h-3.5"></i>
+                  <span class="hidden sm:inline">Mendikte Soal</span>
+                </button>
+              </div>
+              <div class="flex items-center space-x-1.5">
+                <i data-lucide="clock" class="w-3.5 h-3.5 text-amber-400"></i>
+                <div id="timer-display" class="font-mono text-base sm:text-lg font-extrabold text-amber-400">10s</div>
+              </div>
+            </div>
+
+            <div class="w-full text-center py-1">
+              <h2 id="question-text" class="text-sm sm:text-base font-extrabold text-white leading-snug">Memuat pertanyaan...</h2>
+              <p id="question-explanation" class="hidden text-xs font-semibold text-indigo-200 mt-1.5 bg-indigo-950/90 p-2 rounded-lg border border-indigo-500/30 max-h-24 overflow-y-auto"></p>
+            </div>
+
+            <div id="action-controls" class="mt-2 pt-2 border-t border-slate-800">
+              <div id="student-prep-box" class="flex flex-col items-center space-y-1.5">
+                <span class="text-[11px] text-amber-300 font-semibold">Pastikan posisi sudah siap!</span>
+                <button onclick="startStudentAnswering()" class="w-full max-w-xs py-2 px-4 bg-gradient-to-r from-emerald-500 to-teal-500 text-slate-950 font-black rounded-xl">
+                  <span>Mulai Jawab Sekarang!</span>
+                </button>
+              </div>
+
+              <div id="manual-answer-btns" class="hidden grid grid-cols-2 gap-2">
+                <button onclick="submitAnswer(true)" class="py-2 px-3 bg-emerald-600 hover:bg-emerald-500 text-white font-extrabold text-xs sm:text-sm rounded-lg">
+                  <span>BENAR (Kiri)</span>
+                </button>
+                <button onclick="submitAnswer(false)" class="py-2 px-3 bg-rose-600 hover:bg-rose-500 text-white font-extrabold text-xs sm:text-sm rounded-lg">
+                  <span>SALAH (Kanan)</span>
+                </button>
+              </div>
+
+              <div id="view-answer-box" class="hidden flex flex-col items-center space-y-1.5">
+                <span id="view-answer-status" class="text-[11px] text-amber-400 font-bold">Waktu habis!</span>
+                <button onclick="revealAnswer()" class="w-full max-w-xs py-2 px-4 bg-gradient-to-r from-amber-500 to-orange-500 text-slate-950 font-black rounded-xl">
+                  <span>Lihat Jawaban</span>
+                </button>
+              </div>
+
+              <div id="teacher-next-box" class="hidden flex flex-col items-center space-y-1.5">
+                <button onclick="nextQuestionByTeacher()" class="w-full max-w-sm py-2 px-4 bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500 text-white font-black rounded-xl">
+                  <span>Soal Selanjutnya</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section id="tab-questions" class="hidden space-y-8 max-w-4xl mx-auto w-full">
+        <div class="flex flex-wrap items-center justify-between gap-4 border-b border-slate-800 pb-4">
+          <div>
+            <h2 class="text-xl font-bold text-white">Pembuatan Soal Manual</h2>
+            <p class="text-xs text-slate-400 mt-1">Minimal 3 soal untuk bisa memulai game.</p>
+          </div>
+        </div>
+
+        <div class="glass-card p-6 rounded-2xl border border-slate-800 space-y-4">
+          <h3 id="form-title" class="text-sm font-bold text-indigo-300 uppercase tracking-wider">Tambah Soal Baru</h3>
+
+          <form id="question-form" onsubmit="handleQuestionSubmit(event)" class="space-y-4">
+            <input type="hidden" id="edit-index" value="-1" />
+
+            <div>
+              <label class="block text-xs font-semibold text-slate-300 mb-1">Pertanyaan / Pernyataan *</label>
+              <textarea id="input-q-text" rows="2" required placeholder="Contoh: Ibu kota Indonesia adalah Jakarta." class="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-sm text-white"></textarea>
+            </div>
+
+            <div>
+              <label class="block text-xs font-semibold text-slate-300 mb-2">Jawaban Benar *</label>
+              <div class="grid grid-cols-2 gap-3 max-w-md">
+                <label class="flex items-center justify-center p-3 rounded-xl border border-slate-800 bg-slate-950 cursor-pointer transition hover:border-emerald-500/50">
+                  <input type="radio" name="input-answer" value="true" checked class="text-emerald-500">
+                  <span class="ml-2 text-sm font-bold text-emerald-400">BENAR</span>
+                </label>
+                <label class="flex items-center justify-center p-3 rounded-xl border border-slate-800 bg-slate-950 cursor-pointer transition hover:border-rose-500/50">
+                  <input type="radio" name="input-answer" value="false" class="text-rose-500">
+                  <span class="ml-2 text-sm font-bold text-rose-400">SALAH</span>
+                </label>
+              </div>
+            </div>
+
+            <div>
+              <label class="block text-xs font-semibold text-slate-300 mb-1">Penjelasan Tambahan</label>
+              <input type="text" id="input-q-explanation" placeholder="Contoh: Jakarta adalah ibu kota Indonesia." class="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-sm text-white" />
+            </div>
+
+            <div class="flex items-center justify-end space-x-3 pt-2">
+              <button type="button" onclick="resetQuestionForm()" class="px-4 py-2 text-xs font-semibold text-slate-400 hover:text-white transition">Batal</button>
+              <button type="submit" id="btn-save-question" class="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white font-bold rounded-xl text-xs shadow-lg shadow-indigo-600/30 transition">
+                <span>Simpan Soal</span>
+              </button>
+            </div>
+          </form>
+        </div>
+
+        <div class="space-y-3">
+          <div class="flex items-center justify-between">
+            <h3 class="text-sm font-bold text-slate-300">Daftar Soal Aktif (<span id="q-list-count">0</span>)</h3>
+            <span id="q-limit-warning" class="text-xs text-amber-400 hidden">Minimal butuh 3 soal untuk memulai game!</span>
+          </div>
+          <div id="questions-list-container" class="space-y-3"></div>
+        </div>
+      </section>
+
+      <section id="tab-settings" class="hidden space-y-6 max-w-2xl mx-auto w-full">
+        <div class="border-b border-slate-800 pb-4">
+          <h2 class="text-xl font-bold text-white">Pengaturan Waktu & Dikte</h2>
+        </div>
+
+        <div class="glass-card p-6 rounded-2xl border border-slate-800 space-y-4">
+          <label class="block text-sm font-bold text-slate-200">Pilih Batas Waktu Dijawab Per Soal:</label>
+          <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            <button type="button" onclick="setTimerSetting(5)" class="timer-opt-btn p-4 rounded-xl border border-slate-800 bg-slate-950 text-center hover:border-indigo-500 transition" data-time="5">
+              <span class="block text-2xl font-black text-indigo-400">5s</span>
+            </button>
+            <button type="button" onclick="setTimerSetting(10)" class="timer-opt-btn p-4 rounded-xl border border-slate-800 bg-slate-950 text-center hover:border-indigo-500 transition border-indigo-500 bg-indigo-950/40" data-time="10">
+              <span class="block text-2xl font-black text-indigo-400">10s</span>
+            </button>
+            <button type="button" onclick="setTimerSetting(15)" class="timer-opt-btn p-4 rounded-xl border border-slate-800 bg-slate-950 text-center hover:border-indigo-500 transition" data-time="15">
+              <span class="block text-2xl font-black text-indigo-400">15s</span>
+            </button>
+            <button type="button" onclick="setTimerSetting(20)" class="timer-opt-btn p-4 rounded-xl border border-slate-800 bg-slate-950 text-center hover:border-indigo-500 transition" data-time="20">
+              <span class="block text-2xl font-black text-indigo-400">20s</span>
+            </button>
+          </div>
+        </div>
+
+        <div class="glass-card p-6 rounded-2xl border border-slate-800 space-y-4">
+          <h3 class="text-sm font-bold text-slate-200">Pengaturan Fitur Mendiktekan Soal</h3>
+          <div class="flex items-center justify-between p-3 bg-slate-950 rounded-xl border border-slate-800">
+            <div>
+              <span class="block text-xs font-bold text-white">Dikte Otomatis Saat Soal Muncul</span>
+            </div>
+            <label class="relative inline-flex items-center cursor-pointer">
+              <input type="checkbox" id="toggle-auto-dictate" checked class="sr-only peer">
+              <div class="w-11 h-6 bg-slate-800 rounded-full peer-checked:bg-indigo-600 after:content-[''] after:absolute after:top-1 after:left-1 after:w-4 after:h-4 after:rounded-full after:bg-white after:transition-all peer-checked:after:translate-x-5"></div>
+            </label>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <div id="result-modal" class="fixed inset-0 bg-slate-950/80 backdrop-blur-md z-50 flex items-center justify-center p-4 hidden">
+      <div class="glass-card max-w-md w-full rounded-3xl p-6 text-center border border-indigo-500/30 shadow-2xl space-y-4">
+        <div class="w-16 h-16 rounded-2xl bg-gradient-to-tr from-amber-400 to-amber-600 mx-auto flex items-center justify-center text-slate-950 shadow-lg">
+          <i data-lucide="trophy" class="w-8 h-8"></i>
+        </div>
         <div>
-          <span class="text-[10px] uppercase font-bold text-slate-400">Skor Akhir</span>
-          <span id="res-score" class="block text-3xl font-black text-indigo-400">100</span>
+          <h2 class="text-2xl font-extrabold text-white">Permainan Selesai!</h2>
+          <p class="text-xs text-slate-400 mt-1">Berikut adalah hasil evaluasi identifikasi Anda.</p>
         </div>
-        <div>
-          <span class="text-[10px] uppercase font-bold text-slate-400">Akurasi Jawaban</span>
-          <span id="res-accuracy" class="block text-3xl font-black text-emerald-400">100%</span>
+
+        <div class="bg-slate-950/80 rounded-2xl p-4 border border-slate-800 grid grid-cols-2 gap-2">
+          <div>
+            <span class="text-[10px] uppercase font-bold text-slate-400">Skor Akhir</span>
+            <span id="res-score" class="block text-3xl font-black text-indigo-400">0</span>
+          </div>
+          <div>
+            <span class="text-[10px] uppercase font-bold text-slate-400">Akurasi Jawaban</span>
+            <span id="res-accuracy" class="block text-3xl font-black text-emerald-400">0%</span>
+          </div>
         </div>
-      </div>
 
-      <p id="res-feedback" class="text-xs text-indigo-200 font-medium bg-indigo-950/50 p-3 rounded-xl border border-indigo-900/50">Luar biasa! Seluruh jawaban Anda diidentifikasi dengan benar.</p>
+        <p id="res-feedback" class="text-xs text-indigo-200 font-medium bg-indigo-950/50 p-3 rounded-xl border border-indigo-900/50">Coba lagi!</p>
 
-      <div class="flex items-center space-x-3 pt-2">
-        <button onclick="closeModal('result-modal')" class="w-1/2 py-3 bg-slate-800 hover:bg-slate-700 text-xs font-bold text-slate-200 rounded-xl transition">Tutup</button>
-        <button onclick="closeModal('result-modal'); startGame()" class="w-1/2 py-3 bg-indigo-600 hover:bg-indigo-500 text-xs font-bold text-white rounded-xl shadow-lg shadow-indigo-600/30 transition flex items-center justify-center space-x-2">
-          <i data-lucide="rotate-ccw" class="w-4 h-4"></i>
-          <span>Main Lagi</span>
-        </button>
+        <div class="flex items-center space-x-3 pt-2">
+          <button onclick="closeModal('result-modal')" class="w-1/2 py-3 bg-slate-800 hover:bg-slate-700 text-xs font-bold text-slate-200 rounded-xl transition">Tutup</button>
+          <button onclick="closeModal('result-modal'); startGame()" class="w-1/2 py-3 bg-indigo-600 hover:bg-indigo-500 text-xs font-bold text-white rounded-xl transition">Main Lagi</button>
+        </div>
       </div>
     </div>
-  </div>
 
-  <div id="toast-container" class="fixed bottom-20 right-4 z-50 flex flex-col space-y-2 pointer-events-none"></div>
+    <div id="toast-container" class="fixed bottom-20 right-4 z-50 flex flex-col space-y-2 pointer-events-none"></div>
 
-  <script>
-    const supabaseUrl = 'https://YOUR_PROJECT_ID.supabase.co';
-    const supabaseKey = 'YOUR_ANON_KEY';
-    const supabase = supabase.createClient(supabaseUrl, supabaseKey);
+    <script>
+      const STORAGE_KEY = 'educam_questions_storage_v1';
+      const defaultQuestions = [
+        { id: 1, text: 'Matahari terbit dari sebelah Timur.', answer: true, explanation: 'Benar! Matahari tampak terbit di timur karena rotasi bumi.' },
+        { id: 2, text: 'Air membeku pada suhu 100 derajat Celsius.', answer: false, explanation: 'Salah. Air membeku pada 0°C dan mendidih pada 100°C.' },
+        { id: 3, text: 'Monumen Nasional (Monas) terletak di Jakarta.', answer: true, explanation: 'Benar! Monas berada di Jakarta Pusat.' },
+        { id: 4, text: 'Bumi berputar mengelilingi matahari dalam satu tahun.', answer: true, explanation: 'Benar! Bumi membutuhkan sekitar satu tahun untuk mengelilingi matahari.' },
+        { id: 5, text: 'Padi termasuk tanaman yang hidup di air.', answer: true, explanation: 'Benar! Padi umumnya ditanam di sawah yang tergenang air.' }
+      ];
 
-    const STORAGE_KEY = 'educam_questions_storage';
-    let questions = [];
-    let currentQuestionIndex = 0;
-    let timer = 10;
-    let timerInterval = null;
-    let gameStarted = false;
-    let answerVisible = false;
-    let globalSoundEnabled = true;
-    let currentSessionAnswers = [];
-    let questionOrder = [];
-    let pendingAutoDictate = false;
-    let isCameraReady = false;
-    let cameraStream = null;
-    let canvasCtx = null;
-    let animationFrame = null;
-    let lastFrame = null;
-    let currentQuestionReveal = null;
-    let userAnswerSubmitted = false;
-    let currentTimerSetting = 10;
-    let answerZoneTimer = null;
+      let questions = [];
+      let currentQuestionIndex = 0;
+      let timer = 10;
+      let timerInterval = null;
+      let gameStarted = false;
+      let currentSessionAnswers = [];
+      let questionOrder = [];
+      let currentTimerSetting = 10;
+      let answerZoneTimer = null;
+      let globalSoundEnabled = true;
+      let cameraStream = null;
+      let isCameraReady = false;
 
-    const defaultQuestions = [
-      { id: 1, text: 'Matahari terbit dari sebelah Timur.', answer: true, explanation: 'Benar! Perputaran bumi dari barat ke timur menyebabkan matahari terlihat terbit di timur.' },
-      { id: 2, text: 'Air membeku pada suhu 100 derajat Celsius.', answer: false, explanation: 'Salah. Air membeku pada suhu 0°C dan mendidih pada suhu 100°C.' },
-      { id: 3, text: 'Monumen Nasional (Monas) terletak di Jakarta.', answer: true, explanation: 'Benar! Monas berada di Jakarta Pusat.' },
-      { id: 4, text: 'Bumi berputar mengelilingi matahari dalam satu tahun.', answer: true, explanation: 'Benar! Pergerakan bumi mengelilingi matahari membutuhkan waktu kira-kira satu tahun.' },
-      { id: 5, text: 'Padi termasuk tanaman yang hidup di air.', answer: true, explanation: 'Benar! Padi biasanya ditanam di sawah yang tergenang air.' }
-    ];
+      function loadQuestions() {
+        try {
+          const saved = localStorage.getItem(STORAGE_KEY);
+          if (saved) {
+            const parsed = JSON.parse(saved);
+            if (Array.isArray(parsed) && parsed.length) {
+              questions = parsed;
+              return;
+            }
+          }
+        } catch (error) {
+          console.warn('Gagal membaca localStorage:', error);
+        }
 
-    async function loadQuestionsFromDatabase() {
-      try {
-        const { data, error } = await supabase
-          .from('questions')
-          .select('*')
-          .order('created_at', { ascending: true });
+        questions = [...defaultQuestions];
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(questions));
+      }
 
-        if (error) {
-          console.error('Gagal ambil data soal dari Supabase:', error);
-          questions = [...defaultQuestions];
-          renderQuestionList();
+      function saveQuestions() {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(questions));
+      }
+
+      function renderQuestionList() {
+        const container = document.getElementById('questions-list-container');
+        const countEl = document.getElementById('q-list-count');
+        const badgeEl = document.getElementById('question-count-badge');
+        const warningEl = document.getElementById('q-limit-warning');
+
+        if (!container) return;
+
+        container.innerHTML = '';
+
+        if (!questions.length) {
+          container.innerHTML = '<div class="glass-card p-4 rounded-xl border border-slate-800 text-sm text-slate-400">Belum ada soal. Silakan tambah soal baru.</div>';
+        } else {
+          questions.forEach((q, index) => {
+            const item = document.createElement('div');
+            item.className = 'glass-card p-4 rounded-xl border border-slate-800 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3';
+            item.innerHTML = `
+              <div class="flex-1">
+                <div class="flex items-center gap-2 mb-1">
+                  <span class="text-[10px] uppercase font-bold text-indigo-300">Soal ${index + 1}</span>
+                  <span class="px-2 py-0.5 rounded-full text-[10px] font-bold ${q.answer ? 'bg-emerald-500/20 text-emerald-300' : 'bg-rose-500/20 text-rose-300'}">
+                    ${q.answer ? 'BENAR' : 'SALAH'}
+                  </span>
+                </div>
+                <p class="text-sm font-semibold text-white">${q.text}</p>
+                <p class="text-xs text-slate-400 mt-1">${q.explanation || 'Tidak ada penjelasan'}</p>
+              </div>
+              <div class="flex gap-2">
+                <button type="button" onclick="editQuestion(${index})" class="px-3 py-2 rounded-lg bg-amber-500/20 border border-amber-500/30 text-amber-300 text-xs font-bold">Edit</button>
+                <button type="button" onclick="deleteQuestion(${index})" class="px-3 py-2 rounded-lg bg-rose-500/20 border border-rose-500/30 text-rose-300 text-xs font-bold">Hapus</button>
+              </div>
+            `;
+            container.appendChild(item);
+          });
+        }
+
+        if (countEl) countEl.textContent = questions.length;
+        if (badgeEl) badgeEl.textContent = questions.length;
+        if (warningEl) warningEl.classList.toggle('hidden', questions.length >= 3);
+      }
+
+      function showToast(message, type = 'success') {
+        const container = document.getElementById('toast-container');
+        if (!container) return;
+
+        const toast = document.createElement('div');
+        const color = type === 'error' ? 'bg-rose-500/90' : 'bg-emerald-500/90';
+        toast.className = `${color} text-white text-xs font-semibold px-3 py-2 rounded-xl shadow-lg`;
+        toast.textContent = message;
+        container.appendChild(toast);
+
+        setTimeout(() => {
+          toast.remove();
+        }, 2200);
+      }
+
+      function resetQuestionForm() {
+        const form = document.getElementById('question-form');
+        if (!form) return;
+        form.reset();
+        document.getElementById('edit-index').value = '-1';
+        document.getElementById('form-title').textContent = 'Tambah Soal Baru';
+        document.getElementById('btn-save-question').innerHTML = '<span>Simpan Soal</span>';
+        document.querySelector('input[name="input-answer"][value="true"]').checked = true;
+      }
+
+      function handleQuestionSubmit(event) {
+        event.preventDefault();
+
+        const text = document.getElementById('input-q-text').value.trim();
+        const explanation = document.getElementById('input-q-explanation').value.trim();
+        const answer = document.querySelector('input[name="input-answer"]:checked').value === 'true';
+        const editIndex = Number(document.getElementById('edit-index').value);
+
+        if (!text) {
+          showToast('Pertanyaan tidak boleh kosong!', 'error');
           return;
         }
 
-        if (data && data.length > 0) {
-          questions = data.map(item => ({
-            id: item.id,
-            text: item.text,
-            answer: item.answer,
-            explanation: item.explanation || ''
-          }));
+        const payload = { text, answer, explanation };
+
+        if (editIndex >= 0 && questions[editIndex]) {
+          questions[editIndex] = { ...questions[editIndex], ...payload };
         } else {
-          questions = [...defaultQuestions];
+          questions.push({ id: Date.now(), ...payload });
         }
 
+        saveQuestions();
         renderQuestionList();
-      } catch (error) {
-        console.error('Gagal load soal:', error);
-        questions = [...defaultQuestions];
+        resetQuestionForm();
+        showToast('Soal berhasil disimpan!', 'success');
+      }
+
+      function editQuestion(index) {
+        if (!questions[index]) return;
+        const q = questions[index];
+        document.getElementById('edit-index').value = index;
+        document.getElementById('input-q-text').value = q.text;
+        document.getElementById('input-q-explanation').value = q.explanation || '';
+        document.querySelector(`input[name="input-answer"][value="${q.answer ? 'true' : 'false'}"]`).checked = true;
+        document.getElementById('form-title').textContent = 'Edit Soal';
+        document.getElementById('btn-save-question').innerHTML = '<span>Perbarui Soal</span>';
+        switchTab('questions');
+      }
+
+      function deleteQuestion(index) {
+        if (!questions[index]) return;
+        const ok = confirm('Hapus soal ini?');
+        if (!ok) return;
+        questions.splice(index, 1);
+        saveQuestions();
         renderQuestionList();
+        showToast('Soal berhasil dihapus!', 'success');
       }
-    }
 
-    async function saveQuestionToDatabase(newQuestion) {
-      try {
-        const { data, error } = await supabase
-          .from('questions')
-          .insert([
-            {
-              text: newQuestion.text,
-              answer: newQuestion.answer,
-              explanation: newQuestion.explanation || ''
-            }
-          ])
-          .select();
-
-        if (error) {
-          console.error('Gagal simpan soal:', error);
-          showToast('Gagal menyimpan soal ke database', 'error');
-          return false;
-        }
-
-        return true;
-      } catch (error) {
-        console.error('Gagal simpan soal:', error);
-        showToast('Gagal menyimpan soal ke database', 'error');
-        return false;
-      }
-    }
-
-    async function updateQuestionToDatabase(id, updatedQuestion) {
-      try {
-        const { error } = await supabase
-          .from('questions')
-          .update({
-            text: updatedQuestion.text,
-            answer: updatedQuestion.answer,
-            explanation: updatedQuestion.explanation || ''
-          })
-          .eq('id', id);
-
-        if (error) {
-          console.error('Gagal update soal:', error);
-          showToast('Gagal update soal', 'error');
-          return false;
-        }
-
-        return true;
-      } catch (error) {
-        console.error('Gagal update soal:', error);
-        showToast('Gagal update soal', 'error');
-        return false;
-      }
-    }
-
-    async function deleteQuestionFromDatabase(id) {
-      try {
-        const { error } = await supabase
-          .from('questions')
-          .delete()
-          .eq('id', id);
-
-        if (error) {
-          console.error('Gagal hapus soal:', error);
-          showToast('Gagal hapus soal', 'error');
-          return false;
-        }
-
-        return true;
-      } catch (error) {
-        console.error('Gagal hapus soal:', error);
-        showToast('Gagal hapus soal', 'error');
-        return false;
-      }
-    }
-
-    function renderQuestionList() {
-      const container = document.getElementById('questions-list-container');
-      const countEl = document.getElementById('q-list-count');
-      const badgeEl = document.getElementById('question-count-badge');
-      const warningEl = document.getElementById('q-limit-warning');
-
-      if (!container) return;
-
-      container.innerHTML = '';
-
-      if (!questions.length) {
-        container.innerHTML = `
-          <div class="glass-card p-4 rounded-xl border border-slate-800 text-sm text-slate-400">
-            Belum ada soal. Silakan tambah soal baru.
-          </div>
-        `;
-      } else {
-        questions.forEach((q, index) => {
-          const item = document.createElement('div');
-          item.className = 'glass-card p-4 rounded-xl border border-slate-800 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3';
-          item.innerHTML = `
-            <div class="flex-1">
-              <div class="flex items-center gap-2 mb-1">
-                <span class="text-[10px] uppercase font-bold text-indigo-300">Soal ${index + 1}</span>
-                <span class="px-2 py-0.5 rounded-full text-[10px] font-bold ${q.answer ? 'bg-emerald-500/20 text-emerald-300' : 'bg-rose-500/20 text-rose-300'}">
-                  ${q.answer ? 'BENAR' : 'SALAH'}
-                </span>
-              </div>
-              <p class="text-sm font-semibold text-white">${q.text}</p>
-              <p class="text-xs text-slate-400 mt-1">${q.explanation || 'Tidak ada penjelasan'}</p>
-            </div>
-            <div class="flex gap-2">
-              <button type="button" onclick="editQuestion(${index})" class="px-3 py-2 rounded-lg bg-amber-500/20 border border-amber-500/30 text-amber-300 text-xs font-bold">Edit</button>
-              <button type="button" onclick="deleteQuestion(${index})" class="px-3 py-2 rounded-lg bg-rose-500/20 border border-rose-500/30 text-rose-300 text-xs font-bold">Hapus</button>
-            </div>
-          `;
-          container.appendChild(item);
+      function switchTab(tabName) {
+        const tabs = ['game', 'questions', 'settings'];
+        tabs.forEach(tab => {
+          const el = document.getElementById(`tab-${tab}`);
+          if (el) el.classList.toggle('hidden', tab !== tabName);
         });
-      }
 
-      if (countEl) countEl.textContent = questions.length;
-      if (badgeEl) badgeEl.textContent = questions.length;
-      if (warningEl) warningEl.classList.toggle('hidden', questions.length >= 3);
-    }
-
-    async function handleQuestionSubmit(event) {
-      event.preventDefault();
-
-      const text = document.getElementById('input-q-text').value.trim();
-      const explanation = document.getElementById('input-q-explanation').value.trim();
-      const answer = document.querySelector('input[name="input-answer"]:checked').value === 'true';
-      const editIndex = Number(document.getElementById('edit-index').value);
-
-      if (!text) {
-        showToast('Pertanyaan tidak boleh kosong!', 'error');
-        return;
-      }
-
-      const payload = {
-        text,
-        answer,
-        explanation
-      };
-
-      if (editIndex >= 0 && questions[editIndex]) {
-        const currentId = questions[editIndex].id;
-        const ok = await updateQuestionToDatabase(currentId, payload);
-
-        if (!ok) return;
-
-        questions[editIndex] = {
-          ...questions[editIndex],
-          ...payload
+        const buttons = {
+          game: document.getElementById('nav-game-btn'),
+          questions: document.getElementById('nav-questions-btn'),
+          settings: document.getElementById('nav-settings-btn')
         };
-      } else {
-        const ok = await saveQuestionToDatabase(payload);
 
-        if (!ok) return;
+        Object.values(buttons).forEach(btn => {
+          if (!btn) return;
+          btn.classList.remove('bg-indigo-600', 'text-white', 'shadow');
+          btn.classList.add('text-slate-400');
+        });
 
-        const { data, error } = await supabase
-          .from('questions')
-          .select('*')
-          .order('created_at', { ascending: false })
-          .limit(1);
-
-        if (error) {
-          console.error('Gagal ambil soal terakhir:', error);
-        } else if (data && data.length > 0) {
-          questions.push({
-            id: data[0].id,
-            text: data[0].text,
-            answer: data[0].answer,
-            explanation: data[0].explanation || ''
-          });
+        if (buttons[tabName]) {
+          buttons[tabName].classList.remove('text-slate-400');
+          buttons[tabName].classList.add('bg-indigo-600', 'text-white', 'shadow');
         }
       }
 
-      renderQuestionList();
-      resetQuestionForm();
-      showToast('Soal berhasil disimpan ke database!', 'success');
-    }
+      function startTimer() {
+        clearInterval(timerInterval);
+        timerInterval = setInterval(() => {
+          if (!gameStarted) return;
+          timer -= 1;
+          updateTimerDisplay();
+          if (timer <= 0) {
+            clearInterval(timerInterval);
+            timeUp();
+          }
+        }, 1000);
+      }
 
-    function resetQuestionForm() {
-      const form = document.getElementById('question-form');
-      if (!form) return;
+      function updateTimerDisplay() {
+        const timerDisplay = document.getElementById('timer-display');
+        if (timerDisplay) timerDisplay.textContent = `${timer}s`;
+      }
 
-      form.reset();
-      document.getElementById('edit-index').value = '-1';
-      document.getElementById('form-title').textContent = 'Tambah Soal Baru';
-      document.getElementById('btn-save-question').innerHTML =
-        '<i data-lucide="plus-circle" class="w-4 h-4"></i><span>Simpan Soal</span>';
-      document.querySelector('input[name="input-answer"][value="true"]').checked = true;
-      lucide.createIcons();
-    }
+      function setTimerSetting(seconds) {
+        currentTimerSetting = seconds;
+        timer = seconds;
+        document.getElementById('display-timer-setting').textContent = `${seconds} Detik`;
+        document.querySelectorAll('.timer-opt-btn').forEach(btn => {
+          btn.classList.remove('border-indigo-500', 'bg-indigo-950/40');
+        });
+        const selected = document.querySelector(`.timer-opt-btn[data-time="${seconds}"]`);
+        if (selected) selected.classList.add('border-indigo-500', 'bg-indigo-950/40');
+      }
 
-    function editQuestion(index) {
-      if (!questions[index]) return;
-
-      const q = questions[index];
-      document.getElementById('edit-index').value = index;
-      document.getElementById('input-q-text').value = q.text;
-      document.getElementById('input-q-explanation').value = q.explanation || '';
-      document.querySelector(`input[name="input-answer"][value="${q.answer ? 'true' : 'false'}"]`).checked = true;
-
-      document.getElementById('form-title').textContent = 'Edit Soal';
-      document.getElementById('btn-save-question').innerHTML =
-        '<i data-lucide="plus-circle" class="w-4 h-4"></i><span>Perbarui Soal</span>';
-      lucide.createIcons();
-      switchTab('questions');
-    }
-
-    async function deleteQuestion(index) {
-      if (!questions[index]) return;
-
-      const confirmed = confirm('Hapus soal ini?');
-      if (!confirmed) return;
-
-      const id = questions[index].id;
-      const ok = await deleteQuestionFromDatabase(id);
-
-      if (!ok) return;
-
-      questions.splice(index, 1);
-      renderQuestionList();
-      showToast('Soal berhasil dihapus!', 'success');
-    }
-
-    function loadSampleQuestions() {
-      questions = [
-        { id: 1, text: 'Matahari terbit dari sebelah Timur.', answer: true, explanation: 'Benar! Perputaran bumi dari barat ke timur menyebabkan matahari terlihat terbit di timur.' },
-        { id: 2, text: 'Air membeku pada suhu 100 derajat Celsius.', answer: false, explanation: 'Salah. Air membeku pada suhu 0°C dan mendidih pada suhu 100°C.' },
-        { id: 3, text: 'Monumen Nasional (Monas) terletak di Jakarta.', answer: true, explanation: 'Benar! Monas berada di Jakarta Pusat.' }
-      ];
-
-      questions.forEach(async (q) => {
-        const { error } = await supabase
-          .from('questions')
-          .insert([{ text: q.text, answer: q.answer, explanation: q.explanation }])
-          .select();
-
-        if (error) {
-          console.error('Gagal simpan soal contoh:', error);
+      function shuffleArray(arr) {
+        for (let i = arr.length - 1; i > 0; i--) {
+          const j = Math.floor(Math.random() * (i + 1));
+          [arr[i], arr[j]] = [arr[j], arr[i]];
         }
-      });
-
-      renderQuestionList();
-      showToast('Soal contoh berhasil dimuat ke database!', 'success');
-    }
-
-    function switchTab(tabName) {
-      const tabs = ['game', 'questions', 'settings'];
-      tabs.forEach(tab => {
-        const el = document.getElementById(`tab-${tab}`);
-        if (el) el.classList.toggle('hidden', tab !== tabName);
-      });
-
-      const navButtons = [
-        document.getElementById('nav-game-btn'),
-        document.getElementById('nav-questions-btn'),
-        document.getElementById('nav-settings-btn')
-      ];
-
-      navButtons.forEach(btn => {
-        if (!btn) return;
-        btn.classList.remove('bg-indigo-600', 'text-white', 'shadow');
-        btn.classList.add('text-slate-400');
-      });
-
-      const selectedMap = {
-        game: document.getElementById('nav-game-btn'),
-        questions: document.getElementById('nav-questions-btn'),
-        settings: document.getElementById('nav-settings-btn')
-      };
-
-      if (selectedMap[tabName]) {
-        selectedMap[tabName].classList.remove('text-slate-400');
-        selectedMap[tabName].classList.add('bg-indigo-600', 'text-white', 'shadow');
       }
-    }
 
-    function showToast(message, type = 'success') {
-      const container = document.getElementById('toast-container');
-      if (!container) return;
+      function renderQuestion() {
+        if (!questions.length) return;
+        const qIndex = questionOrder[currentQuestionIndex];
+        const current = questions[qIndex];
+        if (!current) return;
 
-      const toast = document.createElement('div');
-      const color = type === 'error' ? 'bg-rose-500/90' : 'bg-emerald-500/90';
-      toast.className = `${color} text-white text-xs font-semibold px-3 py-2 rounded-xl shadow-lg`;
-      toast.textContent = message;
-      container.appendChild(toast);
+        document.getElementById('current-q-num').textContent = currentQuestionIndex + 1;
+        document.getElementById('total-q-num').textContent = questions.length;
+        document.getElementById('question-text').textContent = current.text;
 
-      setTimeout(() => {
-        toast.remove();
-      }, 2200);
-    }
+        document.getElementById('student-prep-box').classList.remove('hidden');
+        document.getElementById('manual-answer-btns').classList.add('hidden');
+        document.getElementById('view-answer-box').classList.add('hidden');
+        document.getElementById('teacher-next-box').classList.add('hidden');
+        document.getElementById('question-explanation').classList.add('hidden');
 
-    function setTimerSetting(seconds) {
-      currentTimerSetting = seconds;
-      timer = seconds;
-      document.getElementById('display-timer-setting').textContent = `${seconds} Detik`;
-      document.querySelectorAll('.timer-opt-btn').forEach(btn => {
-        btn.classList.remove('border-indigo-500', 'bg-indigo-950/40');
-      });
-      const selected = document.querySelector(`.timer-opt-btn[data-time="${seconds}"]`);
-      if (selected) {
-        selected.classList.add('border-indigo-500', 'bg-indigo-950/40');
-      }
-    }
-
-    function updateTimerDisplay() {
-      const timerDisplay = document.getElementById('timer-display');
-      if (!timerDisplay) return;
-      timerDisplay.textContent = `${timer}s`;
-    }
-
-    function startTimer() {
-      clearInterval(timerInterval);
-      timerInterval = setInterval(() => {
-        if (!gameStarted) return;
-        timer -= 1;
+        timer = currentTimerSetting;
         updateTimerDisplay();
 
-        if (timer <= 0) {
-          clearInterval(timerInterval);
-          timeUp();
+        const cameraZones = document.getElementById('camera-zones');
+        if (cameraZones) {
+          cameraZones.classList.add('opacity-0');
+          cameraZones.classList.remove('opacity-100');
         }
-      }, 1000);
-    }
 
-    function startGame() {
-      if (!questions.length) {
-        showToast('Minimal perlu 3 soal sebelum mulai game!', 'error');
-        return;
+        if (document.getElementById('toggle-auto-dictate').checked) {
+          dictateCurrentQuestion();
+        }
       }
 
-      gameStarted = true;
-      currentQuestionIndex = 0;
-      currentSessionAnswers = [];
-      questionOrder = [...Array(questions.length).keys()];
-      shuffleArray(questionOrder);
+      function startGame() {
+        if (questions.length < 3) {
+          showToast('Minimal perlu 3 soal sebelum mulai game!', 'error');
+          return;
+        }
 
-      document.getElementById('question-overlay').classList.remove('-translate-y-full', 'opacity-0');
-      document.getElementById('question-overlay').classList.add('translate-y-0', 'opacity-100');
+        gameStarted = true;
+        currentQuestionIndex = 0;
+        currentSessionAnswers = [];
+        questionOrder = Array.from({ length: questions.length }, (_, i) => i);
+        shuffleArray(questionOrder);
 
-      renderQuestion();
-      startTimer();
-    }
+        const questionOverlay = document.getElementById('question-overlay');
+        if (questionOverlay) {
+          questionOverlay.classList.remove('-translate-y-full', 'opacity-0');
+          questionOverlay.classList.add('translate-y-0', 'opacity-100');
+        }
 
-    function shuffleArray(arr) {
-      for (let i = arr.length - 1; i > 0; i--) {
-        const j = Math.floor(Math.random() * (i + 1));
-        [arr[i], arr[j]] = [arr[j], arr[i]];
-      }
-    }
-
-    function renderQuestion() {
-      const total = questions.length;
-      const qIndex = questionOrder[currentQuestionIndex];
-      const current = questions[qIndex];
-      if (!current) return;
-
-      document.getElementById('current-q-num').textContent = currentQuestionIndex + 1;
-      document.getElementById('total-q-num').textContent = total;
-      document.getElementById('question-text').textContent = current.text;
-
-      if (current.explanation) {
-        document.getElementById('question-explanation').textContent = current.explanation;
+        renderQuestion();
+        startTimer();
       }
 
-      document.getElementById('student-prep-box').classList.remove('hidden');
-      document.getElementById('manual-answer-btns').classList.add('hidden');
-      document.getElementById('view-answer-box').classList.add('hidden');
-      document.getElementById('teacher-next-box').classList.add('hidden');
-      document.getElementById('question-explanation').classList.add('hidden');
-
-      timer = currentTimerSetting;
-      updateTimerDisplay();
-      answerVisible = false;
-      userAnswerSubmitted = false;
-      currentQuestionReveal = current;
-
-      const cameraZones = document.getElementById('camera-zones');
-      if (cameraZones) {
-        cameraZones.classList.add('opacity-0');
-        cameraZones.classList.remove('opacity-100');
+      function startStudentAnswering() {
+        document.getElementById('student-prep-box').classList.add('hidden');
+        document.getElementById('manual-answer-btns').classList.remove('hidden');
+        startTimer();
       }
 
-      if (document.getElementById('toggle-auto-dictate').checked) {
-        dictateCurrentQuestion();
-      }
-    }
+      function flashAnswerZone(isTrue) {
+        const leftZone = document.getElementById('zone-left');
+        const rightZone = document.getElementById('zone-right');
+        const cameraZones = document.getElementById('camera-zones');
+        if (!leftZone || !rightZone || !cameraZones) return;
 
-    function startStudentAnswering() {
-      document.getElementById('student-prep-box').classList.add('hidden');
-      document.getElementById('manual-answer-btns').classList.remove('hidden');
-      userAnswerSubmitted = false;
-      startTimer();
-    }
+        cameraZones.classList.remove('opacity-0');
+        cameraZones.classList.add('opacity-100');
 
-    function flashAnswerZone(isTrue) {
-      const leftZone = document.getElementById('zone-left');
-      const rightZone = document.getElementById('zone-right');
-      const cameraZones = document.getElementById('camera-zones');
-
-      if (!leftZone || !rightZone || !cameraZones) return;
-
-      cameraZones.classList.remove('opacity-0');
-      cameraZones.classList.add('opacity-100');
-
-      leftZone.classList.remove('opacity-50', 'bg-emerald-500/30', 'border-emerald-500', 'brightness-125', 'scale-[1.02]');
-      rightZone.classList.remove('opacity-50', 'bg-rose-500/30', 'border-rose-500', 'brightness-125', 'scale-[1.02]');
-
-      const target = isTrue ? leftZone : rightZone;
-      const other = isTrue ? rightZone : leftZone;
-
-      target.classList.add('bg-emerald-500/30', 'border-emerald-500', 'brightness-125', 'scale-[1.02]');
-      if (isTrue) {
-        target.classList.add('border-emerald-500');
-      } else {
-        target.classList.add('border-rose-500');
-      }
-      other.classList.add('opacity-50');
-
-      clearTimeout(answerZoneTimer);
-      answerZoneTimer = setTimeout(() => {
         leftZone.classList.remove('opacity-50', 'bg-emerald-500/30', 'border-emerald-500', 'brightness-125', 'scale-[1.02]');
         rightZone.classList.remove('opacity-50', 'bg-rose-500/30', 'border-rose-500', 'brightness-125', 'scale-[1.02]');
-        cameraZones.classList.add('opacity-0');
-      }, 1200);
-    }
 
-    function submitAnswer(isTrue) {
-      if (!gameStarted || userAnswerSubmitted) return;
-      userAnswerSubmitted = true;
-      clearInterval(timerInterval);
+        const target = isTrue ? leftZone : rightZone;
+        const other = isTrue ? rightZone : leftZone;
 
-      const qIndex = questionOrder[currentQuestionIndex];
-      const current = questions[qIndex];
-      currentSessionAnswers.push({
-        question: current.text,
-        userAnswer: isTrue,
-        correctAnswer: current.answer,
-        correct: isTrue === current.answer
-      });
+        target.classList.add('bg-emerald-500/30', 'border-emerald-500', 'brightness-125', 'scale-[1.02]');
+        other.classList.add('opacity-50');
 
-      flashAnswerZone(current.answer);
-
-      document.getElementById('manual-answer-btns').classList.add('hidden');
-      document.getElementById('view-answer-box').classList.remove('hidden');
-      document.getElementById('view-answer-status').textContent = current.answer ? 'Jawaban benar! Tekan tombol di bawah untuk lihat kunci jawaban.' : 'Jawaban Anda tidak cocok. Tekan tombol di bawah untuk melihat kunci jawaban.';
-      document.getElementById('question-explanation').classList.remove('hidden');
-      document.getElementById('question-explanation').textContent = current.explanation;
-
-      if (currentQuestionIndex + 1 < questions.length) {
-        document.getElementById('teacher-next-box').classList.remove('hidden');
-      } else {
-        setTimeout(endGame, 700);
-      }
-    }
-
-    function revealAnswer() {
-      const qIndex = questionOrder[currentQuestionIndex];
-      const current = questions[qIndex];
-      document.getElementById('question-explanation').classList.remove('hidden');
-      document.getElementById('question-explanation').textContent = current.explanation;
-      showToast(current.answer ? 'Jawaban: BENAR' : 'Jawaban: SALAH', 'success');
-    }
-
-    function timeUp() {
-      if (!gameStarted) return;
-      const qIndex = questionOrder[currentQuestionIndex];
-      const current = questions[qIndex];
-      currentSessionAnswers.push({
-        question: current.text,
-        userAnswer: null,
-        correctAnswer: current.answer,
-        correct: false
-      });
-
-      flashAnswerZone(current.answer);
-
-      document.getElementById('manual-answer-btns').classList.add('hidden');
-      document.getElementById('view-answer-box').classList.remove('hidden');
-      document.getElementById('view-answer-status').textContent = 'Waktu habis! Tekan tombol di bawah untuk melihat kunci jawaban.';
-      document.getElementById('question-explanation').classList.remove('hidden');
-      document.getElementById('question-explanation').textContent = current.explanation;
-
-      if (currentQuestionIndex + 1 < questions.length) {
-        document.getElementById('teacher-next-box').classList.remove('hidden');
-      } else {
-        setTimeout(endGame, 700);
-      }
-    }
-
-    function nextQuestionByTeacher() {
-      if (currentQuestionIndex + 1 >= questions.length) {
-        endGame();
-        return;
-      }
-      currentQuestionIndex += 1;
-      renderQuestion();
-      startTimer();
-      document.getElementById('teacher-next-box').classList.add('hidden');
-    }
-
-    function endGame() {
-      gameStarted = false;
-      clearInterval(timerInterval);
-
-      const correctCount = currentSessionAnswers.filter(item => item.correct).length;
-      const accuracy = currentSessionAnswers.length ? Math.round((correctCount / currentSessionAnswers.length) * 100) : 0;
-
-      document.getElementById('res-score').textContent = correctCount;
-      document.getElementById('res-accuracy').textContent = `${accuracy}%`;
-      document.getElementById('res-feedback').textContent = accuracy >= 80
-        ? 'Luar biasa! Anda sangat paham materi.'
-        : accuracy >= 60
-          ? 'Bagus! Masih ada ruang untuk ditingkatkan.'
-          : 'Coba lagi, fokus pada materi dan latihan lebih banyak.';
-
-      document.getElementById('result-modal').classList.remove('hidden');
-      document.getElementById('question-overlay').classList.add('-translate-y-full', 'opacity-0');
-    }
-
-    function closeModal(id) {
-      document.getElementById(id).classList.add('hidden');
-    }
-
-    function startWebcam() {
-      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-        showToast('Browser tidak mendukung kamera.', 'error');
-        return;
+        clearTimeout(answerZoneTimer);
+        answerZoneTimer = setTimeout(() => {
+          leftZone.classList.remove('opacity-50', 'bg-emerald-500/30', 'border-emerald-500', 'brightness-125', 'scale-[1.02]');
+          rightZone.classList.remove('opacity-50', 'bg-rose-500/30', 'border-rose-500', 'brightness-125', 'scale-[1.02]');
+          cameraZones.classList.add('opacity-0');
+        }, 1200);
       }
 
-      navigator.mediaDevices.getUserMedia({ video: true, audio: false })
-        .then(stream => {
-          cameraStream = stream;
-          const video = document.getElementById('webcam-video');
-          video.srcObject = stream;
-          video.classList.remove('hidden');
-          document.getElementById('camera-placeholder').classList.add('hidden');
-          document.getElementById('cam-status-text').textContent = 'Kamera Aktif';
-          document.getElementById('cam-dot').classList.remove('bg-red-500');
-          document.getElementById('cam-dot').classList.add('bg-emerald-500');
-          isCameraReady = true;
-          startCameraLoop();
-        })
-        .catch(err => {
-          console.error(err);
-          showToast('Kamera tidak bisa dijalankan. Izinkan akses kamera!', 'error');
+      function submitAnswer(isTrue) {
+        if (!gameStarted) return;
+        const qIndex = questionOrder[currentQuestionIndex];
+        const current = questions[qIndex];
+
+        currentSessionAnswers.push({
+          question: current.text,
+          userAnswer: isTrue,
+          correctAnswer: current.answer,
+          correct: isTrue === current.answer
         });
-    }
 
-    function startCameraLoop() {
-      const video = document.getElementById('webcam-video');
-      const canvas = document.getElementById('camera-canvas');
-      if (!video || !canvas) return;
+        clearInterval(timerInterval);
+        flashAnswerZone(current.answer);
 
-      canvasCtx = canvas.getContext('2d');
-      const drawLoop = () => {
-        if (isCameraReady && video.readyState >= 2) {
-          const w = video.videoWidth || 640;
-          const h = video.videoHeight || 480;
-          canvas.width = w;
-          canvas.height = h;
-          canvasCtx.drawImage(video, 0, 0, w, h);
+        document.getElementById('manual-answer-btns').classList.add('hidden');
+        document.getElementById('view-answer-box').classList.remove('hidden');
+        document.getElementById('view-answer-status').textContent = current.answer ? 'Jawaban benar! Tekan tombol di bawah untuk melihat kunci jawaban.' : 'Jawaban Anda tidak cocok. Tekan tombol di bawah untuk melihat kunci jawaban.';
+        document.getElementById('question-explanation').classList.remove('hidden');
+        document.getElementById('question-explanation').textContent = current.explanation;
 
-          const imgData = canvasCtx.getImageData(0, 0, w, h);
-          const data = imgData.data;
-          let left = 0;
-          let right = 0;
+        if (currentQuestionIndex + 1 < questions.length) {
+          document.getElementById('teacher-next-box').classList.remove('hidden');
+        } else {
+          setTimeout(endGame, 700);
+        }
+      }
 
-          for (let i = 0; i < data.length; i += 4) {
-            const r = data[i];
-            const g = data[i + 1];
-            const b = data[i + 2];
-            const brightness = (r + g + b) / 3;
+      function revealAnswer() {
+        const qIndex = questionOrder[currentQuestionIndex];
+        const current = questions[qIndex];
+        document.getElementById('question-explanation').classList.remove('hidden');
+        document.getElementById('question-explanation').textContent = current.explanation;
+        showToast(current.answer ? 'Jawaban: BENAR' : 'Jawaban: SALAH', 'success');
+      }
 
-            if (brightness > 120) {
-              if ((i / 4) % w < w / 2) left += 1;
-              else right += 1;
-            }
-          }
+      function timeUp() {
+        if (!gameStarted) return;
+        const qIndex = questionOrder[currentQuestionIndex];
+        const current = questions[qIndex];
+        currentSessionAnswers.push({
+          question: current.text,
+          userAnswer: null,
+          correctAnswer: current.answer,
+          correct: false
+        });
 
-          const leftMeter = document.getElementById('meter-left');
-          const rightMeter = document.getElementById('meter-right');
-          const cameraZones = document.getElementById('camera-zones');
+        flashAnswerZone(current.answer);
 
-          if (gameStarted && currentQuestionReveal) {
-            cameraZones.classList.remove('opacity-0');
-            cameraZones.classList.add('opacity-100');
-          }
+        document.getElementById('manual-answer-btns').classList.add('hidden');
+        document.getElementById('view-answer-box').classList.remove('hidden');
+        document.getElementById('view-answer-status').textContent = 'Waktu habis! Tekan tombol di bawah untuk melihat kunci jawaban.';
+        document.getElementById('question-explanation').classList.remove('hidden');
+        document.getElementById('question-explanation').textContent = current.explanation;
 
-          const leftPercent = Math.min(100, (left / Math.max(1, w * h / 2)) * 100);
-          const rightPercent = Math.min(100, (right / Math.max(1, w * h / 2)) * 100);
+        if (currentQuestionIndex + 1 < questions.length) {
+          document.getElementById('teacher-next-box').classList.remove('hidden');
+        } else {
+          setTimeout(endGame, 700);
+        }
+      }
 
-          leftMeter.style.width = `${leftPercent}%`;
-          rightMeter.style.width = `${rightPercent}%`;
+      function nextQuestionByTeacher() {
+        if (currentQuestionIndex + 1 >= questions.length) {
+          endGame();
+          return;
+        }
+        currentQuestionIndex += 1;
+        document.getElementById('teacher-next-box').classList.add('hidden');
+        renderQuestion();
+        startTimer();
+      }
+
+      function endGame() {
+        gameStarted = false;
+        clearInterval(timerInterval);
+
+        const correctCount = currentSessionAnswers.filter(item => item.correct).length;
+        const accuracy = currentSessionAnswers.length ? Math.round((correctCount / currentSessionAnswers.length) * 100) : 0;
+
+        document.getElementById('res-score').textContent = correctCount;
+        document.getElementById('res-accuracy').textContent = `${accuracy}%`;
+        document.getElementById('res-feedback').textContent = accuracy >= 80
+          ? 'Luar biasa! Anda sangat paham materi.'
+          : accuracy >= 60
+            ? 'Bagus! Masih ada ruang untuk ditingkatkan.'
+            : 'Coba lagi, fokus dan latihan lebih banyak.';
+
+        document.getElementById('result-modal').classList.remove('hidden');
+        document.getElementById('question-overlay').classList.add('-translate-y-full', 'opacity-0');
+      }
+
+      function closeModal(id) {
+        document.getElementById(id).classList.add('hidden');
+      }
+
+      function toggleGlobalSound() {
+        globalSoundEnabled = !globalSoundEnabled;
+        const btn = document.getElementById('sound-toggle-btn');
+        if (btn) {
+          btn.classList.toggle('text-emerald-400', globalSoundEnabled);
+          btn.classList.toggle('text-slate-300', !globalSoundEnabled);
+        }
+      }
+
+      function dictateCurrentQuestion() {
+        const questionText = document.getElementById('question-text')?.textContent || '';
+        if (!questionText || !('speechSynthesis' in window)) {
+          showToast('Browser Anda tidak mendukung voice synthesis.', 'error');
+          return;
         }
 
-        animationFrame = requestAnimationFrame(drawLoop);
-      };
-
-      cancelAnimationFrame(animationFrame);
-      drawLoop();
-    }
-
-    function toggleFullscreenCam() {
-      const container = document.getElementById('camera-container');
-      const exitBtn = document.getElementById('btn-exit-fullscreen');
-      if (!document.fullscreenElement) {
-        container.requestFullscreen?.();
-        exitBtn.classList.remove('hidden');
-      } else {
-        document.exitFullscreen?.();
-        exitBtn.classList.add('hidden');
+        const utterance = new SpeechSynthesisUtterance(questionText);
+        utterance.lang = 'id-ID';
+        utterance.rate = 0.95;
+        if (!globalSoundEnabled) {
+          utterance.volume = 0;
+        }
+        window.speechSynthesis.cancel();
+        window.speechSynthesis.speak(utterance);
       }
-    }
 
-    function toggleGlobalSound() {
-      globalSoundEnabled = !globalSoundEnabled;
-      const btn = document.getElementById('sound-toggle-btn');
-      btn.classList.toggle('text-emerald-400', globalSoundEnabled);
-    }
+      async function startWebcam() {
+        if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+          showToast('Browser ini tidak mendukung akses kamera.', 'error');
+          return;
+        }
 
-    function dictateCurrentQuestion() {
-      if (!('speechSynthesis' in window)) return;
-      const text = document.getElementById('question-text')?.textContent;
-      if (!text) return;
-      const utterance = new SpeechSynthesisUtterance(text);
-      utterance.lang = 'id-ID';
-      utterance.rate = 0.95;
-      speechSynthesis.cancel();
-      speechSynthesis.speak(utterance);
-    }
+        try {
+          const stream = await navigator.mediaDevices.getUserMedia({
+            video: { facingMode: 'user' },
+            audio: false
+          });
 
-    function initializeDefaults() {
-      loadQuestionsFromDatabase();
-      renderQuestionList();
-      resetQuestionForm();
-      setTimerSetting(10);
-      switchTab('game');
-      lucide.createIcons();
-    }
+          cameraStream = stream;
+          const video = document.getElementById('webcam-video');
+          const placeholder = document.getElementById('camera-placeholder');
+          const canvas = document.getElementById('camera-canvas');
 
-    document.getElementById('question-form').addEventListener('submit', handleQuestionSubmit);
-    document.getElementById('toggle-auto-dictate').addEventListener('change', function () {
-      if (this.checked) {
-        showToast('Dikte otomatis aktif', 'success');
+          video.srcObject = stream;
+          video.classList.remove('hidden');
+          canvas.classList.remove('hidden');
+          if (placeholder) placeholder.classList.add('hidden');
+
+          isCameraReady = true;
+          updateCameraStatus(true);
+          showToast('Kamera berhasil diaktifkan.', 'success');
+        } catch (error) {
+          console.error(error);
+          showToast('Akses kamera ditolak. Izinkan kamera di browser Anda.', 'error');
+        }
       }
-    });
 
-    window.addEventListener('load', initializeDefaults);
-  </script>
-</body>
+      function updateCameraStatus(active) {
+        const indicator = document.getElementById('cam-status-indicator');
+        const text = document.getElementById('cam-status-text');
+        const dot = document.getElementById('cam-dot');
+        if (indicator) indicator.classList.toggle('hidden', !active);
+        if (text) text.textContent = active ? 'Kamera Aktif' : 'Kamera Mati';
+        if (dot) dot.classList.toggle('bg-red-500', !active);
+        if (dot) dot.classList.toggle('bg-emerald-500', active);
+      }
+
+      function toggleFullscreenCam() {
+        const container = document.getElementById('camera-container');
+        if (!container) return;
+
+        if (document.fullscreenElement) {
+          document.exitFullscreen();
+        } else {
+          container.requestFullscreen().catch(() => showToast('Full screen tidak didukung di browser ini.', 'error'));
+        }
+      }
+
+      function initApp() {
+        loadQuestions();
+        renderQuestionList();
+        setTimerSetting(10);
+        switchTab('game');
+        lucide.createIcons();
+        updateCameraStatus(false);
+      }
+
+      document.addEventListener('DOMContentLoaded', initApp);
+    </script>
+  </body>
 </html>
